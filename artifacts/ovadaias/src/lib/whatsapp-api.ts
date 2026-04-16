@@ -74,6 +74,7 @@ export type WaTicket = {
   status: string;
   priority: string;
   category: string | null;
+  internalNotes?: string | null;
   createdBy: string;
   assignedTo: string | null;
   createdAt: string;
@@ -144,5 +145,17 @@ export const waApi = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(patch),
     }).then(j<{ ok: boolean }>),
+  createTicket: (input: {
+    conversationId: number;
+    title: string;
+    summary?: string;
+    priority?: string;
+    category?: string;
+  }) =>
+    fetch(`${BASE}/whatsapp/tickets`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }).then(j<{ ok: boolean; id: number }>),
   mediaUrl: (messageId: number) => `${BASE}/whatsapp/messages/${messageId}/media`,
 };

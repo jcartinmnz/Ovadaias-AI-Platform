@@ -17,7 +17,24 @@ import {
   CheckCircle2,
   Power,
   Loader2,
+  Ticket as TicketIcon,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import {
   waApi,
@@ -27,13 +44,33 @@ import {
 
 export default function WhatsappInboxPage() {
   const { toast } = useToast();
+  const [location] = useLocation();
   const [conversations, setConversations] = useState<WaConversationListItem[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [detail, setDetail] = useState<WaConversationDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [draft, setDraft] = useState("");
+  const [ticketOpen, setTicketOpen] = useState(false);
+  const [ticketSaving, setTicketSaving] = useState(false);
+  const [ticketDraft, setTicketDraft] = useState({
+    title: "",
+    summary: "",
+    priority: "normal",
+    category: "",
+  });
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Allow opening a specific conversation via ?conversation=ID (deep link from tickets)
+  useEffect(() => {
+    const qs = typeof window !== "undefined" ? window.location.search : "";
+    const params = new URLSearchParams(qs);
+    const id = params.get("conversation");
+    if (id) {
+      const n = Number(id);
+      if (Number.isInteger(n)) setSelectedId(n);
+    }
+  }, [location]);
 
   const loadConversations = async () => {
     try {
@@ -240,6 +277,22 @@ export default function WhatsappInboxPage() {
                   <Button
                     variant="ghost"
                     size="sm"
+                    onClick={() => {
+                      setTicketDraft({
+                        title: "",
+                        summary: "",
+                        priority: "normal",
+                        category: "",
+                      });
+                      setTicketOpen(true);
+                    }}
+                    title="Crear ticket desde esta conversación"
+                  >
+                    <TicketIcon className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={toggleClosed}
                     title={
                       detail.status === "closed"
@@ -299,6 +352,89 @@ export default function WhatsappInboxPage() {
           )}
         </div>
       </div>
+
+      <Dialog open={ticketOpen} onOpenChange={setTicketOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nuevo ticket</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Input
+              placeholder="Título"
+              value={ticketDraft.title}
+              onChange={(e) =>
+                setTicketDraft((d) => ({ ...d, title: e.target.value }))
+              }
+            />
+            <Textarea
+              rows={4}
+              placeholder="Resumen del problema o solicitud"
+              value={ticketDraft.summary}
+              onChange={(e) =>
+                setTicketDraft((d) => ({ ...d, summary: e.target.value }))
+              }
+            />
+            <div className="grid grid-cols-2 gap-2">
+              <Select
+                value={ticketDraft.priority}
+                onValueChange={(v) =>
+                  setTicketDraft((d) => ({ ...d, priority: v }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="low">Baja</SelectItem>
+                  <SelectItem value="normal">Normal</SelectItem>
+                  <SelectItem value="high">Alta</SelectItem>
+                  <SelectItem value="urgent">Urgente</SelectItem>
+                </SelectContent>
+              </Select>
+              <Input
+                placeholder="Categoría (opcional)"
+                value={ticketDraft.category}
+                onChange={(e) =>
+                  setTicketDraft((d) => ({ ...d, category: e.target.value }))
+                }
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setTicketOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              disabled={ticketSaving || !ticketDraft.title.trim() || !selectedId}
+              onClick={async () => {
+                if (!selectedId) return;
+                setTicketSaving(true);
+                try {
+                  await waApi.createTicket({
+                    conversationId: selectedId,
+                    title: ticketDraft.title.trim(),
+                    summary: ticketDraft.summary.trim() || undefined,
+                    priority: ticketDraft.priority,
+                    category: ticketDraft.category.trim() || undefined,
+                  });
+                  toast({ title: "Ticket creado" });
+                  setTicketOpen(false);
+                } catch (e) {
+                  toast({
+                    title: "Error",
+                    description: e instanceof Error ? e.message : "Falló",
+                    variant: "destructive",
+                  });
+                } finally {
+                  setTicketSaving(false);
+                }
+              }}
+            >
+              Crear ticket
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Shell>
   );
 }

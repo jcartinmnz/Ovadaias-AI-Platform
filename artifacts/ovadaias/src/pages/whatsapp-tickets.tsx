@@ -10,10 +10,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Ticket as TicketIcon, ExternalLink } from "lucide-react";
+import { Ticket as TicketIcon, ExternalLink, StickyNote } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { waApi, type WaTicket } from "@/lib/whatsapp-api";
 import { Link } from "wouter";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const STATUS_COLOR: Record<string, string> = {
   open: "bg-amber-500/20 text-amber-300 border-amber-500/40",
@@ -32,6 +40,9 @@ export default function WhatsappTicketsPage() {
   const { toast } = useToast();
   const [tickets, setTickets] = useState<WaTicket[]>([]);
   const [filter, setFilter] = useState<string>("all");
+  const [notesEditing, setNotesEditing] = useState<WaTicket | null>(null);
+  const [notesDraft, setNotesDraft] = useState("");
+  const [savingNotes, setSavingNotes] = useState(false);
 
   const load = async () => {
     try {
@@ -114,7 +125,18 @@ export default function WhatsappTicketsPage() {
                       #{t.id} · {new Date(t.createdAt).toLocaleString("es")}
                     </div>
                   </div>
-                  <Link href={`/whatsapp`}>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    title="Notas internas"
+                    onClick={() => {
+                      setNotesEditing(t);
+                      setNotesDraft(t.internalNotes ?? "");
+                    }}
+                  >
+                    <StickyNote className="w-4 h-4" />
+                  </Button>
+                  <Link href={`/whatsapp?conversation=${t.conversationId}`}>
                     <Button size="icon" variant="ghost" title="Abrir conversación">
                       <ExternalLink className="w-4 h-4" />
                     </Button>
@@ -146,6 +168,14 @@ export default function WhatsappTicketsPage() {
                   <p className="text-sm text-foreground/80 whitespace-pre-wrap">
                     {t.summary}
                   </p>
+                )}
+                {t.internalNotes && (
+                  <div className="text-xs bg-amber-500/10 border border-amber-500/30 rounded p-2 text-amber-100/90 whitespace-pre-wrap">
+                    <span className="font-mono uppercase text-[10px] text-amber-300">
+                      Notas internas
+                    </span>
+                    <div className="mt-1">{t.internalNotes}</div>
+                  </div>
                 )}
                 <div className="flex items-center gap-2 pt-2 border-t border-border/30">
                   <Select
@@ -182,6 +212,60 @@ export default function WhatsappTicketsPage() {
           </div>
         </ScrollArea>
       </div>
+
+      <Dialog
+        open={!!notesEditing}
+        onOpenChange={(o) => {
+          if (!o) setNotesEditing(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              Notas internas — Ticket #{notesEditing?.id}
+            </DialogTitle>
+          </DialogHeader>
+          <Textarea
+            rows={8}
+            value={notesDraft}
+            onChange={(e) => setNotesDraft(e.target.value)}
+            placeholder="Notas privadas del equipo (no se envían al cliente)"
+          />
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => setNotesEditing(null)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              disabled={savingNotes}
+              onClick={async () => {
+                if (!notesEditing) return;
+                setSavingNotes(true);
+                try {
+                  await waApi.updateTicket(notesEditing.id, {
+                    internalNotes: notesDraft,
+                  });
+                  toast({ title: "Notas guardadas" });
+                  setNotesEditing(null);
+                  await load();
+                } catch (e) {
+                  toast({
+                    title: "Error",
+                    description: String(e),
+                    variant: "destructive",
+                  });
+                } finally {
+                  setSavingNotes(false);
+                }
+              }}
+            >
+              Guardar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Shell>
   );
 }

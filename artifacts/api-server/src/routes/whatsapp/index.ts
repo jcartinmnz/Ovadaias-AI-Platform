@@ -118,6 +118,34 @@ router.get("/whatsapp/status", async (_req, res) => {
 
 // ───────────── Webhook from Evolution ─────────────
 
+// Per-key (phone or IP) sliding-window rate limiter for the webhook
+const WEBHOOK_RATE_WINDOW_MS = 60_000;
+const WEBHOOK_RATE_MAX = 30; // max events per minute per key
+const webhookHits = new Map<string, number[]>();
+function rateLimited(key: string) {
+  const now = Date.now();
+  const arr = webhookHits.get(key) ?? [];
+  const fresh = arr.filter((t) => now - t < WEBHOOK_RATE_WINDOW_MS);
+  fresh.push(now);
+  webhookHits.set(key, fresh);
+  if (webhookHits.size > 5000) {
+    // simple cleanup
+    for (const [k, v] of webhookHits) {
+      if (!v.length || now - v[v.length - 1] > WEBHOOK_RATE_WINDOW_MS * 5) {
+        webhookHits.delete(k);
+      }
+    }
+  }
+  return fresh.length > WEBHOOK_RATE_MAX;
+}
+function extractRateKey(body: Record<string, unknown>, ip: string) {
+  const data = (body.data ?? body) as Record<string, unknown>;
+  const key = (data.key ?? {}) as Record<string, unknown>;
+  const jid = typeof key.remoteJid === "string" ? key.remoteJid : "";
+  const phone = jid.split("@")[0]?.replace(/\D/g, "");
+  return phone || ip || "unknown";
+}
+
 router.post("/whatsapp/webhook", async (req, res) => {
   // Optional shared-secret check via query param or header
   const settings = await db
@@ -136,7 +164,14 @@ router.post("/whatsapp/webhook", async (req, res) => {
   }
 
   const body = (req.body ?? {}) as Record<string, unknown>;
+  const rateKey = extractRateKey(body, req.ip ?? "");
+  if (rateLimited(rateKey)) {
+    res.status(429).json({ ok: false, error: "rate limited", key: rateKey });
+    return;
+  }
+
   const event = String(body.event || "");
+  void event;
   const data = (body.data ?? body) as Record<string, unknown>;
 
   // Only process upsert/incoming message events
@@ -199,11 +234,21 @@ router.get("/whatsapp/conversations", async (req, res) => {
 });
 
 router.get("/whatsapp/conversations/unread-count", async (_req, res) => {
+  // "Awaiting human attention": bot disabled OR has unread inbound messages.
   const [row] = await db
     .select({
-      count: sql<number>`COALESCE(SUM(${whatsappConversations.unreadCount}), 0)::int`,
+      count: sql<number>`COUNT(*)::int`,
     })
-    .from(whatsappConversations);
+    .from(whatsappConversations)
+    .where(
+      and(
+        eq(whatsappConversations.status, "open"),
+        or(
+          eq(whatsappConversations.botEnabled, false),
+          sql`${whatsappConversations.unreadCount} > 0`,
+        ),
+      ),
+    );
   res.json({ count: row?.count ?? 0 });
 });
 
@@ -413,6 +458,7 @@ router.get("/whatsapp/tickets", async (req, res) => {
       createdAt: r.t.createdAt.toISOString(),
       updatedAt: r.t.updatedAt.toISOString(),
       resolvedAt: r.t.resolvedAt ? r.t.resolvedAt.toISOString() : null,
+      internalNotes: r.t.internalNotes,
       contact: r.contact
         ? { id: r.contact.id, phone: r.contact.phone, name: r.contact.name }
         : null,
@@ -444,6 +490,9 @@ router.patch("/whatsapp/tickets/:id", async (req, res) => {
     if (allowed.has(body.priority)) patch.priority = body.priority;
   }
   if (typeof body.category === "string") patch.category = body.category.slice(0, 100);
+  if (typeof body.internalNotes === "string")
+    patch.internalNotes = body.internalNotes.slice(0, 8000);
+  if (body.internalNotes === null) patch.internalNotes = null;
   if (typeof body.assignedTo === "string")
     patch.assignedTo = body.assignedTo.slice(0, 200);
   if (Object.keys(patch).length === 1) {

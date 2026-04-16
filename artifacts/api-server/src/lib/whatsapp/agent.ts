@@ -1,6 +1,7 @@
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, gte, lte } from "drizzle-orm";
 import {
   db,
+  events,
   whatsappConversations,
   whatsappMessages,
   whatsappTickets,
@@ -81,6 +82,40 @@ const TOOLS = [
   {
     type: "function" as const,
     function: {
+      name: "list_calendar_events",
+      description:
+        "Consulta eventos de la agenda corporativa en un rango (ISO 8601). Úsala para responder al cliente si pregunta por disponibilidad o próximas reuniones, o antes de agendar para evitar choques.",
+      parameters: {
+        type: "object",
+        properties: {
+          from: { type: "string", description: "Inicio (ISO 8601)" },
+          to: { type: "string", description: "Fin (ISO 8601)" },
+        },
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "schedule_appointment",
+      description:
+        "Agenda una reunión/cita en el calendario corporativo cuando el cliente confirma fecha y hora. Usa siempre tipo 'meeting'. La hora debe ir en ISO 8601 con zona.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "Título corto de la cita" },
+          startAt: { type: "string", description: "ISO 8601 con zona horaria" },
+          endAt: { type: "string", description: "ISO 8601 fin (opcional)" },
+          location: { type: "string" },
+          description: { type: "string" },
+        },
+        required: ["title", "startAt"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
       name: "save_contact_note",
       description:
         "Guarda una nota sobre el contacto (preferencias, datos relevantes para futuras conversaciones).",
@@ -112,6 +147,8 @@ Reglas críticas:
 - Sé breve y conversacional para WhatsApp: respuestas cortas, párrafos cortos, no uses tablas largas. Sí puedes usar emojis con moderación.
 - Nunca prometas plazos exactos sin confirmar con un humano.
 - Si el cliente envía audio o imagen, ya recibiste su contenido transcrito/descrito al inicio del mensaje del usuario.
+- Si el cliente quiere agendar una reunión/cita, usa list_calendar_events para revisar disponibilidad y luego schedule_appointment cuando tengas fecha/hora confirmada en ISO 8601. Confirma siempre la cita al cliente con fecha y hora legibles.
+- Hora actual del servidor: ${new Date().toISOString()} (UTC). Interpreta fechas relativas en torno a esta referencia.
 - Cliente actual: ${opts.contactName ? `${opts.contactName} (${opts.contactPhone})` : opts.contactPhone}${opts.language ? ` — idioma detectado: ${opts.language}` : ""}.`;
 
   return opts.customPrompt && opts.customPrompt.trim()
@@ -268,6 +305,79 @@ export async function runCustomerServiceAgent(input: {
             .set({ botEnabled: false, updatedAt: new Date() })
             .where(eq(whatsappConversations.id, input.conversationId));
           result = { ok: true, handoff: true };
+        } else if (call.function.name === "list_calendar_events") {
+          try {
+            const fromD = args.from
+              ? new Date(String(args.from))
+              : new Date();
+            const toD = args.to ? new Date(String(args.to)) : null;
+            if (isNaN(fromD.getTime()) || (toD && isNaN(toD.getTime()))) {
+              result = { error: "from/to inválidos (usa ISO 8601)" };
+              actions.push({ tool: call.function.name, args, result });
+              messages.push({
+                role: "tool",
+                tool_call_id: call.id,
+                content: JSON.stringify(result),
+              });
+              continue;
+            }
+            const rows = await db
+              .select()
+              .from(events)
+              .where(
+                toD
+                  ? and(gte(events.startAt, fromD), lte(events.startAt, toD))
+                  : gte(events.startAt, fromD),
+              )
+              .orderBy(asc(events.startAt))
+              .limit(50);
+            result = {
+              count: rows.length,
+              events: rows.map((e) => ({
+                id: e.id,
+                title: e.title,
+                type: e.type,
+                startAt: e.startAt.toISOString(),
+                endAt: e.endAt ? e.endAt.toISOString() : null,
+                location: e.location,
+              })),
+            };
+          } catch (e) {
+            result = { error: e instanceof Error ? e.message : "calendar error" };
+          }
+        } else if (call.function.name === "schedule_appointment") {
+          try {
+            const title = String(args.title || "").trim().slice(0, 200);
+            const startAt = new Date(String(args.startAt || ""));
+            if (!title || isNaN(startAt.getTime())) {
+              result = { error: "title y startAt (ISO 8601) son obligatorios" };
+            } else {
+              const endAt = args.endAt ? new Date(String(args.endAt)) : null;
+              const baseDesc = `Agendado por WhatsApp con ${contact?.name || contact?.phone || "cliente"}.`;
+              const description = args.description
+                ? `${baseDesc}\n${String(args.description).slice(0, 1500)}`
+                : baseDesc;
+              const [created] = await db
+                .insert(events)
+                .values({
+                  title,
+                  type: "meeting",
+                  startAt,
+                  endAt: endAt && !isNaN(endAt.getTime()) ? endAt : null,
+                  allDay: "false",
+                  location: args.location ? String(args.location).slice(0, 200) : null,
+                  description,
+                })
+                .returning({ id: events.id, startAt: events.startAt });
+              result = {
+                ok: true,
+                eventId: created.id,
+                startAt: created.startAt.toISOString(),
+              };
+            }
+          } catch (e) {
+            result = { error: e instanceof Error ? e.message : "schedule error" };
+          }
         } else if (call.function.name === "save_contact_note") {
           const note = String(args.note || "").slice(0, 1000);
           if (note) {

@@ -88,6 +88,7 @@ export const whatsappTickets = pgTable("whatsapp_tickets", {
   status: varchar("status", { length: 16 }).notNull().default("open"), // open | in_progress | resolved | closed
   priority: varchar("priority", { length: 8 }).notNull().default("normal"), // low | normal | high | urgent
   category: text("category"),
+  internalNotes: text("internal_notes"),
   createdBy: varchar("created_by", { length: 16 }).notNull().default("agent"), // agent | human
   assignedTo: text("assigned_to"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
