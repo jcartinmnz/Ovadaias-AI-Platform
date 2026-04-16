@@ -1,7 +1,7 @@
 import { useListOpenaiConversations, useCreateOpenaiConversation, getListOpenaiConversationsQueryKey } from "@workspace/api-client-react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Plus, MessageSquare, Terminal } from "lucide-react";
+import { Plus, MessageSquare, Terminal, Database } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -32,7 +32,7 @@ export function Sidebar() {
         </div>
       </div>
       
-      <div className="p-3">
+      <div className="p-3 space-y-2">
         <Button 
           onClick={handleNewChat} 
           className="w-full justify-start gap-2 bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary-foreground border border-primary/20"
@@ -41,6 +41,15 @@ export function Sidebar() {
           <Plus className="w-4 h-4" />
           New Chat
         </Button>
+        <Link href="/knowledge">
+          <Button
+            className="w-full justify-start gap-2 border border-border/40 hover:bg-sidebar-accent"
+            variant="ghost"
+          >
+            <Database className="w-4 h-4" />
+            Knowledge Base
+          </Button>
+        </Link>
       </div>
 
       <ScrollArea className="flex-1 px-3">

@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import ChatPage from "@/pages/chat";
 import ConversationsPage from "@/pages/conversations";
+import KnowledgePage from "@/pages/knowledge";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -21,6 +22,7 @@ function Router() {
       <Route path="/" component={ChatPage} />
       <Route path="/chat/:id" component={ChatPage} />
       <Route path="/conversations" component={ConversationsPage} />
+      <Route path="/knowledge" component={KnowledgePage} />
       <Route component={NotFound} />
     </Switch>
   );

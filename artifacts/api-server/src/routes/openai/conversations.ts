@@ -10,6 +10,7 @@ import {
   SendOpenaiMessageBody,
 } from "@workspace/api-zod";
 import { openai } from "@workspace/integrations-openai-ai-server";
+import { retrieveRelevantChunks, formatContextForPrompt } from "../../lib/rag";
 
 const router = Router();
 
@@ -161,8 +162,20 @@ router.post("/conversations/:id/messages", async (req, res) => {
     content: body.data.content,
   });
 
+  let ragContext = "";
+  try {
+    const retrieved = await retrieveRelevantChunks(body.data.content, 5, 0.2);
+    ragContext = formatContextForPrompt(retrieved);
+  } catch (err) {
+    console.error("RAG retrieval failed:", err);
+  }
+
+  const systemContent = ragContext
+    ? `${OVADAIAS_SYSTEM_PROMPT}\n\n${ragContext}\n\nUsa la información anterior cuando sea relevante para la pregunta. Si la información no es suficiente, dilo claramente.`
+    : OVADAIAS_SYSTEM_PROMPT;
+
   const chatMessages = [
-    { role: "system" as const, content: OVADAIAS_SYSTEM_PROMPT },
+    { role: "system" as const, content: systemContent },
     ...existingMessages.map((m) => ({
       role: m.role as "user" | "assistant",
       content: m.content,
