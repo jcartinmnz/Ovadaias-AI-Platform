@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Plus, MessageSquare, Terminal, Database, Sparkles, Calendar } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useQueryClient } from "@tanstack/react-query";
+import { RemindersBell } from "@/components/calendar/reminders-bell";
 
 export function Sidebar() {
   const { data: conversations, isLoading } = useListOpenaiConversations();
@@ -68,6 +69,7 @@ export function Sidebar() {
             Calendar
           </Button>
         </Link>
+        <RemindersBell />
       </div>
 
       <ScrollArea className="flex-1 px-3">

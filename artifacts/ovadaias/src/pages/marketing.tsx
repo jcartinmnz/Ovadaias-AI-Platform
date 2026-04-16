@@ -15,8 +15,11 @@ import {
   ChevronLeft,
   ChevronRight,
   Layers,
+  CalendarPlus,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { EventDialog } from "@/components/calendar/event-dialog";
+import { createEvent, type EventInput } from "@/lib/events-api";
 
 const ENDPOINT = `${import.meta.env.BASE_URL.replace(/\/$/, "")}/api/marketing/generate-asset`;
 
@@ -61,6 +64,7 @@ export default function MarketingPage() {
   const [slides, setSlides] = useState(1);
   const [result, setResult] = useState<GenerateResponse | null>(null);
   const [activeIdx, setActiveIdx] = useState(0);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
 
   const mutation = useMutation({
     mutationFn: generateAsset,
@@ -294,12 +298,12 @@ export default function MarketingPage() {
                       </div>
                     )}
 
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap">
                       <Button
                         onClick={() => handleDownload(activeSlide, activeIdx)}
                         variant="outline"
                         size="sm"
-                        className="flex-1 gap-2"
+                        className="flex-1 min-w-[140px] gap-2"
                       >
                         <Download className="w-4 h-4" />
                         Descargar slide
@@ -309,12 +313,20 @@ export default function MarketingPage() {
                           onClick={handleDownloadAll}
                           variant="outline"
                           size="sm"
-                          className="flex-1 gap-2"
+                          className="flex-1 min-w-[140px] gap-2"
                         >
                           <Download className="w-4 h-4" />
                           Descargar todos
                         </Button>
                       )}
+                      <Button
+                        onClick={() => setScheduleOpen(true)}
+                        size="sm"
+                        className="flex-1 min-w-[140px] gap-2 bg-primary hover:bg-primary/90"
+                      >
+                        <CalendarPlus className="w-4 h-4" />
+                        Agendar publicación
+                      </Button>
                     </div>
                   </div>
                 ) : (
@@ -360,6 +372,41 @@ export default function MarketingPage() {
           </div>
         </ScrollArea>
       </div>
+
+      <EventDialog
+        open={scheduleOpen}
+        onOpenChange={setScheduleOpen}
+        initialValues={
+          result
+            ? {
+                title:
+                  brief.trim().slice(0, 80) ||
+                  (isCarousel
+                    ? `Publicación carrusel (${result.slides.length} slides)`
+                    : "Publicación"),
+                type: "publication",
+                description: [
+                  brief && `Brief: ${brief.trim()}`,
+                  audience && `Audiencia: ${audience.trim()}`,
+                  format && `Formato: ${format.trim()}`,
+                  isCarousel
+                    ? `Carrusel de ${result.slides.length} slides`
+                    : "Imagen única",
+                ]
+                  .filter(Boolean)
+                  .join("\n"),
+              }
+            : null
+        }
+        onSave={async (input: EventInput) => {
+          await createEvent(input);
+          window.dispatchEvent(new CustomEvent("ovadaias:calendar-changed"));
+          toast({
+            title: "Publicación agendada",
+            description: "Encuéntrala en el Calendar.",
+          });
+        }}
+      />
     </div>
   );
 }

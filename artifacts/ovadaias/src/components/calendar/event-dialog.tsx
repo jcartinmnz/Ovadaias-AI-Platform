@@ -31,6 +31,7 @@ type Props = {
   onOpenChange: (open: boolean) => void;
   initialDate?: Date | null;
   event?: CalendarEvent | null;
+  initialValues?: Partial<EventInput> | null;
   onSave: (input: EventInput, id?: number) => Promise<void>;
   onDelete?: (id: number) => Promise<void>;
 };
@@ -53,6 +54,7 @@ export function EventDialog({
   onOpenChange,
   initialDate,
   event,
+  initialValues,
   onSave,
   onDelete,
 }: Props) {
@@ -77,18 +79,24 @@ export function EventDialog({
       setLocation(event.location ?? "");
       setDescription(event.description ?? "");
     } else {
-      const base = initialDate ? new Date(initialDate) : new Date();
-      base.setHours(9, 0, 0, 0);
-      setTitle("");
-      setType("custom");
+      const base = initialValues?.startAt
+        ? new Date(initialValues.startAt)
+        : initialDate
+          ? new Date(initialDate)
+          : new Date();
+      if (!initialValues?.startAt) base.setHours(9, 0, 0, 0);
+      setTitle(initialValues?.title ?? "");
+      setType(initialValues?.type ?? "custom");
       setStartAt(toLocalInput(base));
-      setEndAt("");
-      setAllDay(false);
-      setLocation("");
-      setDescription("");
+      setEndAt(
+        initialValues?.endAt ? toLocalInput(new Date(initialValues.endAt)) : "",
+      );
+      setAllDay(initialValues?.allDay ?? false);
+      setLocation(initialValues?.location ?? "");
+      setDescription(initialValues?.description ?? "");
     }
     setErr(null);
-  }, [open, event, initialDate]);
+  }, [open, event, initialDate, initialValues]);
 
   const handleSave = async () => {
     setErr(null);
