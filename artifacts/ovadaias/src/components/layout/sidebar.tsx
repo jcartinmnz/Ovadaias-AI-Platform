@@ -28,7 +28,7 @@ export function Sidebar() {
       <div className="p-4 border-b border-sidebar-border flex items-center justify-between">
         <div className="flex items-center gap-2 text-primary">
           <Terminal className="w-5 h-5" />
-          <span className="font-mono font-bold tracking-tight text-sidebar-foreground">OVADAIAS</span>
+          <span className="font-bold tracking-[0.2em] text-sidebar-foreground" style={{ fontFamily: 'var(--app-font-display)', backgroundImage: 'var(--brand-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>OVADAIAS</span>
         </div>
       </div>
       

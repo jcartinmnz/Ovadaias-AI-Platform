@@ -137,7 +137,7 @@ export default function ChatPage() {
                 <TerminalSquare className="w-10 h-10 text-primary" />
               </div>
               <div className="space-y-2">
-                <h2 className="text-3xl font-mono tracking-tight font-semibold">Hola, soy Ovadaias.</h2>
+                <h2 className="text-4xl tracking-tight font-bold" style={{ fontFamily: 'var(--app-font-display)', backgroundImage: 'var(--brand-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Hola, soy Ovadaias.</h2>
                 <p className="text-muted-foreground text-sm">¿En qué puedo ayudarte hoy? This is a secure enterprise environment.</p>
               </div>
             </div>
