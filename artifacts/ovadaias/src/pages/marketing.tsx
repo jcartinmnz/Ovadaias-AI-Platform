@@ -17,7 +17,6 @@ import {
   Layers,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { ClockCalendar } from "@/components/clock-calendar";
 
 const ENDPOINT = `${import.meta.env.BASE_URL.replace(/\/$/, "")}/api/marketing/generate-asset`;
 
@@ -228,7 +227,6 @@ export default function MarketingPage() {
             </form>
 
             <div className="space-y-4">
-              <ClockCalendar />
               <div className="bg-card/40 border border-border/40 rounded-lg p-5 min-h-[300px] flex items-center justify-center">
                 {mutation.isPending ? (
                   <div className="text-center text-muted-foreground space-y-2">

@@ -55,34 +55,31 @@ export function ClockCalendar() {
   });
 
   return (
-    <div className="bg-card/40 border border-border/40 rounded-lg p-5 space-y-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-primary mb-1">
-            <Clock className="w-3.5 h-3.5" />
-            Hora local
-          </div>
-          <div
-            className="text-3xl font-bold tabular-nums tracking-wide"
-            style={{ fontFamily: "var(--app-font-display)" }}
-          >
-            {time}
-          </div>
-          <div className="text-xs text-muted-foreground capitalize mt-1">
-            {dateLong}
-          </div>
-        </div>
-        <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-primary">
-          <CalendarDays className="w-3.5 h-3.5" />
-          {MONTHS[month]} {year}
-        </div>
+    <div className="bg-sidebar-accent/30 border border-border/40 rounded-md p-3 space-y-2.5">
+      <div className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider text-primary">
+        <Clock className="w-3 h-3" />
+        Hora local
+      </div>
+      <div
+        className="text-xl font-bold tabular-nums tracking-wide leading-none"
+        style={{ fontFamily: "var(--app-font-display)" }}
+      >
+        {time}
+      </div>
+      <div className="text-[10px] text-muted-foreground capitalize leading-tight">
+        {dateLong}
       </div>
 
-      <div className="grid grid-cols-7 gap-1 text-center text-[11px]">
+      <div className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider text-primary pt-1 border-t border-border/30">
+        <CalendarDays className="w-3 h-3" />
+        {MONTHS[month]} {year}
+      </div>
+
+      <div className="grid grid-cols-7 gap-0.5 text-center text-[10px]">
         {WEEKDAYS.map((d) => (
           <div
             key={d}
-            className="font-mono uppercase text-muted-foreground py-1"
+            className="font-mono uppercase text-muted-foreground py-0.5"
           >
             {d}
           </div>
@@ -94,10 +91,10 @@ export function ClockCalendar() {
             <div
               key={i}
               className={
-                "py-1.5 rounded font-mono " +
+                "py-1 rounded font-mono leading-none " +
                 (isToday
                   ? "bg-primary text-primary-foreground font-bold"
-                  : "text-foreground/80 hover:bg-sidebar-accent")
+                  : "text-foreground/80")
               }
             >
               {c}

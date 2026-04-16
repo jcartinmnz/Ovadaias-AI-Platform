@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Plus, MessageSquare, Terminal, Database, Sparkles } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useQueryClient } from "@tanstack/react-query";
+import { ClockCalendar } from "@/components/clock-calendar";
 
 export function Sidebar() {
   const { data: conversations, isLoading } = useListOpenaiConversations();
@@ -59,6 +60,7 @@ export function Sidebar() {
             Marketing Studio
           </Button>
         </Link>
+        <ClockCalendar />
       </div>
 
       <ScrollArea className="flex-1 px-3">
