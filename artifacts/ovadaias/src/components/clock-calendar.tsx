@@ -55,7 +55,7 @@ export function ClockCalendar() {
   });
 
   return (
-    <div className="bg-sidebar-accent/30 border border-border/40 rounded-md p-3 space-y-2.5">
+    <div className="rounded-md p-4 space-y-3">
       <div className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider text-primary">
         <Clock className="w-3 h-3" />
         Hora local
