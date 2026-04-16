@@ -5,14 +5,30 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Sparkles, Loader2, Download, Image as ImageIcon, FileText, BookOpen } from "lucide-react";
+import {
+  Sparkles,
+  Loader2,
+  Download,
+  Image as ImageIcon,
+  FileText,
+  BookOpen,
+  ChevronLeft,
+  ChevronRight,
+  Layers,
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const ENDPOINT = `${import.meta.env.BASE_URL.replace(/\/$/, "")}/api/marketing/generate-asset`;
 
-interface GenerateResponse {
-  enhancedPrompt: string;
+interface SlideResult {
+  title: string;
+  prompt: string;
   image: { b64: string; mimeType: string };
+}
+
+interface GenerateResponse {
+  mode: "single" | "carousel";
+  slides: SlideResult[];
   sources: { documentId: number; documentTitle: string }[];
   model: string;
 }
@@ -22,6 +38,7 @@ async function generateAsset(payload: {
   audience?: string;
   format?: string;
   useKnowledge: boolean;
+  slides: number;
 }): Promise<GenerateResponse> {
   const r = await fetch(ENDPOINT, {
     method: "POST",
@@ -41,13 +58,19 @@ export default function MarketingPage() {
   const [audience, setAudience] = useState("");
   const [format, setFormat] = useState("");
   const [useKnowledge, setUseKnowledge] = useState(true);
+  const [slides, setSlides] = useState(1);
   const [result, setResult] = useState<GenerateResponse | null>(null);
+  const [activeIdx, setActiveIdx] = useState(0);
 
   const mutation = useMutation({
     mutationFn: generateAsset,
     onSuccess: (data) => {
       setResult(data);
-      toast({ title: "Imagen lista", description: `Generada con ${data.model}` });
+      setActiveIdx(0);
+      toast({
+        title: data.mode === "carousel" ? "Carrusel listo" : "Imagen lista",
+        description: `${data.slides.length} ${data.slides.length === 1 ? "imagen" : "slides"} generadas con ${data.model}`,
+      });
     },
     onError: (err: Error) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -63,16 +86,26 @@ export default function MarketingPage() {
       audience: audience.trim() || undefined,
       format: format.trim() || undefined,
       useKnowledge,
+      slides,
     });
   };
 
-  const handleDownload = () => {
-    if (!result) return;
+  const handleDownload = (slide: SlideResult, idx: number) => {
     const link = document.createElement("a");
-    link.href = `data:${result.image.mimeType};base64,${result.image.b64}`;
-    link.download = `ovadaias-${Date.now()}.png`;
+    link.href = `data:${slide.image.mimeType};base64,${slide.image.b64}`;
+    link.download = `ovadaias-slide-${idx + 1}-${Date.now()}.png`;
     link.click();
   };
+
+  const handleDownloadAll = () => {
+    if (!result) return;
+    result.slides.forEach((s, i) => {
+      setTimeout(() => handleDownload(s, i), i * 200);
+    });
+  };
+
+  const activeSlide = result?.slides[activeIdx];
+  const isCarousel = result && result.slides.length > 1;
 
   return (
     <div className="flex h-screen bg-background text-foreground">
@@ -94,13 +127,13 @@ export default function MarketingPage() {
               MARKETING · STUDIO
             </h1>
             <p className="text-xs text-muted-foreground font-mono">
-              Sub-agente creativo · Brief → Prompt → Imagen
+              Sub-agente creativo · Brief → Storyboard → Imágenes
             </p>
           </div>
         </header>
 
         <ScrollArea className="flex-1">
-          <div className="max-w-5xl mx-auto p-6 grid lg:grid-cols-2 gap-6">
+          <div className="max-w-6xl mx-auto p-6 grid lg:grid-cols-2 gap-6">
             <form
               onSubmit={handleSubmit}
               className="space-y-4 bg-card/40 border border-border/40 rounded-lg p-5"
@@ -113,7 +146,7 @@ export default function MarketingPage() {
                   value={brief}
                   onChange={(e) => setBrief(e.target.value)}
                   rows={6}
-                  placeholder="Ej: Banner para anunciar el lanzamiento de la nueva política de seguridad de credenciales con 2FA…"
+                  placeholder="Ej: Carrusel de LinkedIn que explique nuestra nueva política de seguridad con 2FA en 5 slides…"
                   required
                 />
               </div>
@@ -135,10 +168,30 @@ export default function MarketingPage() {
                   <Input
                     value={format}
                     onChange={(e) => setFormat(e.target.value)}
-                    placeholder="Banner Slack, post LinkedIn…"
+                    placeholder="Carrusel LinkedIn, IG…"
                   />
                 </div>
               </div>
+
+              <div>
+                <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-2">
+                  <Layers className="w-3.5 h-3.5" />
+                  Número de slides: <span className="text-primary">{slides}</span>
+                </label>
+                <input
+                  type="range"
+                  min={1}
+                  max={10}
+                  value={slides}
+                  onChange={(e) => setSlides(Number(e.target.value))}
+                  className="w-full accent-primary"
+                />
+                <div className="flex justify-between text-[10px] text-muted-foreground font-mono mt-1">
+                  <span>1 imagen</span>
+                  <span>10 slides</span>
+                </div>
+              </div>
+
               <label className="flex items-center gap-2 text-sm cursor-pointer">
                 <input
                   type="checkbox"
@@ -147,7 +200,7 @@ export default function MarketingPage() {
                   className="w-4 h-4 accent-primary"
                 />
                 <BookOpen className="w-4 h-4 text-primary" />
-                Usar la base de conocimiento de Ovadaias como contexto
+                Usar la base de conocimiento como contexto
               </label>
               <Button
                 type="submit"
@@ -157,19 +210,19 @@ export default function MarketingPage() {
                 {mutation.isPending ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    Generando…
+                    {slides > 1 ? `Generando ${slides} slides…` : "Generando…"}
                   </>
                 ) : (
                   <>
                     <Sparkles className="w-4 h-4" />
-                    Generar imagen
+                    {slides > 1 ? `Generar carrusel (${slides})` : "Generar imagen"}
                   </>
                 )}
               </Button>
               <p className="text-[10px] text-muted-foreground font-mono leading-relaxed">
-                El sub-agente toma tu brief y el contexto de tu base de conocimiento,
-                redacta un prompt visual detallado en inglés según los requerimientos
-                del cliente y lo entrega al modelo nano-banana (gemini-2.5-flash-image).
+                Para carruseles, el sub-agente diseña una secuencia narrativa coherente
+                (mismo lenguaje visual en todos los slides) y la entrega al modelo
+                nano-banana (gemini-2.5-flash-image).
               </p>
             </form>
 
@@ -178,43 +231,118 @@ export default function MarketingPage() {
                 {mutation.isPending ? (
                   <div className="text-center text-muted-foreground space-y-2">
                     <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" />
-                    <p className="text-sm font-mono">Renderizando…</p>
+                    <p className="text-sm font-mono">
+                      {slides > 1 ? `Renderizando ${slides} slides…` : "Renderizando…"}
+                    </p>
                   </div>
-                ) : result ? (
+                ) : activeSlide ? (
                   <div className="w-full space-y-3">
-                    <img
-                      src={`data:${result.image.mimeType};base64,${result.image.b64}`}
-                      alt="Generado"
-                      className="w-full rounded-md border border-border/40"
-                    />
-                    <Button
-                      onClick={handleDownload}
-                      variant="outline"
-                      size="sm"
-                      className="w-full gap-2"
-                    >
-                      <Download className="w-4 h-4" />
-                      Descargar imagen
-                    </Button>
+                    <div className="relative">
+                      <img
+                        src={`data:${activeSlide.image.mimeType};base64,${activeSlide.image.b64}`}
+                        alt={activeSlide.title}
+                        className="w-full rounded-md border border-border/40"
+                      />
+                      {isCarousel && (
+                        <>
+                          <button
+                            onClick={() =>
+                              setActiveIdx(
+                                (i) => (i - 1 + result.slides.length) % result.slides.length,
+                              )
+                            }
+                            className="absolute left-2 top-1/2 -translate-y-1/2 bg-background/80 hover:bg-background border border-border/40 rounded-full p-2"
+                            aria-label="Anterior"
+                          >
+                            <ChevronLeft className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() =>
+                              setActiveIdx((i) => (i + 1) % result.slides.length)
+                            }
+                            className="absolute right-2 top-1/2 -translate-y-1/2 bg-background/80 hover:bg-background border border-border/40 rounded-full p-2"
+                            aria-label="Siguiente"
+                          >
+                            <ChevronRight className="w-4 h-4" />
+                          </button>
+                          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-background/80 rounded-full px-3 py-1 text-xs font-mono">
+                            {activeIdx + 1} / {result.slides.length}
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                    {isCarousel && (
+                      <div className="flex gap-2 overflow-x-auto pb-1">
+                        {result.slides.map((s, i) => (
+                          <button
+                            key={i}
+                            onClick={() => setActiveIdx(i)}
+                            className={`flex-shrink-0 w-16 h-16 rounded border-2 overflow-hidden transition ${
+                              i === activeIdx
+                                ? "border-primary"
+                                : "border-border/40 opacity-60 hover:opacity-100"
+                            }`}
+                          >
+                            <img
+                              src={`data:${s.image.mimeType};base64,${s.image.b64}`}
+                              alt={s.title}
+                              className="w-full h-full object-cover"
+                            />
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => handleDownload(activeSlide, activeIdx)}
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 gap-2"
+                      >
+                        <Download className="w-4 h-4" />
+                        Descargar slide
+                      </Button>
+                      {isCarousel && (
+                        <Button
+                          onClick={handleDownloadAll}
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 gap-2"
+                        >
+                          <Download className="w-4 h-4" />
+                          Descargar todos
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 ) : (
                   <div className="text-center text-muted-foreground space-y-2">
                     <ImageIcon className="w-10 h-10 mx-auto opacity-30" />
-                    <p className="text-sm font-mono">La imagen aparecerá aquí</p>
+                    <p className="text-sm font-mono">
+                      {slides > 1
+                        ? "El carrusel aparecerá aquí"
+                        : "La imagen aparecerá aquí"}
+                    </p>
                   </div>
                 )}
               </div>
 
-              {result && (
+              {activeSlide && (
                 <div className="bg-card/40 border border-border/40 rounded-lg p-5 space-y-3">
-                  <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-primary">
-                    <FileText className="w-3.5 h-3.5" />
-                    Prompt enviado a nano-banana
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-primary">
+                      <FileText className="w-3.5 h-3.5" />
+                      {isCarousel
+                        ? `Slide ${activeIdx + 1} · ${activeSlide.title}`
+                        : "Prompt enviado a nano-banana"}
+                    </div>
                   </div>
                   <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap font-mono">
-                    {result.enhancedPrompt}
+                    {activeSlide.prompt}
                   </p>
-                  {result.sources.length > 0 && (
+                  {result && result.sources.length > 0 && (
                     <div className="pt-3 border-t border-border/40 space-y-1">
                       <div className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
                         Fuentes consultadas
