@@ -8,6 +8,9 @@ import ConversationsPage from "@/pages/conversations";
 import KnowledgePage from "@/pages/knowledge";
 import MarketingPage from "@/pages/marketing";
 import CalendarPage from "@/pages/calendar";
+import WhatsappInboxPage from "@/pages/whatsapp-inbox";
+import WhatsappTicketsPage from "@/pages/whatsapp-tickets";
+import WhatsappSettingsPage from "@/pages/whatsapp-settings";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -27,6 +30,9 @@ function Router() {
       <Route path="/knowledge" component={KnowledgePage} />
       <Route path="/marketing" component={MarketingPage} />
       <Route path="/calendar" component={CalendarPage} />
+      <Route path="/whatsapp" component={WhatsappInboxPage} />
+      <Route path="/whatsapp/tickets" component={WhatsappTicketsPage} />
+      <Route path="/whatsapp/settings" component={WhatsappSettingsPage} />
       <Route component={NotFound} />
     </Switch>
   );

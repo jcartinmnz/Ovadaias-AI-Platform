@@ -12,6 +12,9 @@ import {
   Database,
   Sparkles,
   Calendar,
+  MessageCircle,
+  Ticket,
+  Settings,
   FolderPlus,
   ChevronDown,
   ChevronRight,
@@ -43,6 +46,64 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
+import { waApi } from "@/lib/whatsapp-api";
+
+function WhatsappNavLinks() {
+  const [unread, setUnread] = useState(0);
+  useEffect(() => {
+    let stop = false;
+    const tick = () => {
+      waApi
+        .unreadCount()
+        .then((d) => {
+          if (!stop) setUnread(d.count);
+        })
+        .catch(() => {});
+    };
+    tick();
+    const t = setInterval(tick, 8000);
+    return () => {
+      stop = true;
+      clearInterval(t);
+    };
+  }, []);
+  return (
+    <>
+      <Link href="/whatsapp">
+        <Button
+          className="w-full justify-start gap-2 border border-border/40 hover:bg-sidebar-accent relative"
+          variant="ghost"
+        >
+          <MessageCircle className="w-4 h-4" />
+          WhatsApp Inbox
+          {unread > 0 && (
+            <span className="ml-auto inline-flex items-center justify-center text-[10px] font-mono bg-primary text-primary-foreground rounded-full min-w-[20px] h-5 px-1.5">
+              {unread > 99 ? "99+" : unread}
+            </span>
+          )}
+        </Button>
+      </Link>
+      <Link href="/whatsapp/tickets">
+        <Button
+          className="w-full justify-start gap-2 border border-border/40 hover:bg-sidebar-accent"
+          variant="ghost"
+        >
+          <Ticket className="w-4 h-4" />
+          WhatsApp Tickets
+        </Button>
+      </Link>
+      <Link href="/whatsapp/settings">
+        <Button
+          className="w-full justify-start gap-2 border border-border/40 hover:bg-sidebar-accent"
+          variant="ghost"
+        >
+          <Settings className="w-4 h-4" />
+          WhatsApp Settings
+        </Button>
+      </Link>
+    </>
+  );
+}
 
 type Conv = {
   id: number;
@@ -204,6 +265,7 @@ export function Sidebar() {
             Calendar
           </Button>
         </Link>
+        <WhatsappNavLinks />
         <RemindersBell />
       </div>
 
