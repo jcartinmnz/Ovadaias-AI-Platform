@@ -3,6 +3,7 @@ import healthRouter from "./health";
 import openaiRouter from "./openai";
 import marketingRouter from "./marketing";
 import calendarRouter from "./calendar";
+import chatProjectsRouter from "./chat-projects";
 
 const router: IRouter = Router();
 
@@ -10,5 +11,6 @@ router.use(healthRouter);
 router.use("/openai", openaiRouter);
 router.use(marketingRouter);
 router.use(calendarRouter);
+router.use(chatProjectsRouter);
 
 export default router;

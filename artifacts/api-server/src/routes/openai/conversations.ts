@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { eq } from "drizzle-orm";
-import { db, conversations, messages } from "@workspace/db";
+import { db, conversations, messages, chatProjects } from "@workspace/db";
 import {
   CreateOpenaiConversationBody,
   GetOpenaiConversationParams,
@@ -61,6 +61,7 @@ router.get("/conversations", async (req, res) => {
     all.map((c) => ({
       id: c.id,
       title: c.title,
+      projectId: c.projectId,
       createdAt: c.createdAt.toISOString(),
     }))
   );
@@ -72,13 +73,19 @@ router.post("/conversations", async (req, res) => {
     res.status(400).json({ error: "Invalid request body" });
     return;
   }
+  const projectIdRaw = (req.body as { projectId?: unknown })?.projectId;
+  const projectId =
+    typeof projectIdRaw === "number" && Number.isFinite(projectIdRaw)
+      ? projectIdRaw
+      : null;
   const [conv] = await db
     .insert(conversations)
-    .values({ title: parsed.data.title })
+    .values({ title: parsed.data.title, projectId })
     .returning();
   res.status(201).json({
     id: conv.id,
     title: conv.title,
+    projectId: conv.projectId,
     createdAt: conv.createdAt.toISOString(),
   });
 });
@@ -197,9 +204,27 @@ router.post("/conversations/:id/messages", async (req, res) => {
     console.error("RAG retrieval failed:", err);
   }
 
-  const systemContent = ragContext
-    ? `${OVADAIAS_SYSTEM_PROMPT}\n\n${ragContext}\n\nUsa la información anterior cuando sea relevante para la pregunta. Si la información no es suficiente, dilo claramente.`
-    : OVADAIAS_SYSTEM_PROMPT;
+  let projectBlock = "";
+  if (conv.projectId) {
+    try {
+      const [proj] = await db
+        .select()
+        .from(chatProjects)
+        .where(eq(chatProjects.id, conv.projectId));
+      if (proj && proj.systemPrompt && proj.systemPrompt.trim()) {
+        projectBlock = `\n\n[Contexto del proyecto "${proj.name}"]\n${proj.systemPrompt.trim()}`;
+      }
+    } catch (err) {
+      console.error("Project prompt fetch failed:", err);
+    }
+  }
+
+  const systemContent =
+    OVADAIAS_SYSTEM_PROMPT +
+    projectBlock +
+    (ragContext
+      ? `\n\n${ragContext}\n\nUsa la información anterior cuando sea relevante para la pregunta. Si la información no es suficiente, dilo claramente.`
+      : "");
 
   const chatMessages = [
     { role: "system" as const, content: systemContent },
