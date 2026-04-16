@@ -94,6 +94,9 @@ export default function CalendarPage() {
 
   useEffect(() => {
     refresh();
+    const onChange = () => refresh();
+    window.addEventListener('ovadaias:calendar-changed', onChange);
+    return () => window.removeEventListener('ovadaias:calendar-changed', onChange);
   }, [refresh]);
 
   const eventsByDay = useMemo(() => {

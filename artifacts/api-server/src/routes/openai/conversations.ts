@@ -11,6 +11,7 @@ import {
 } from "@workspace/api-zod";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { retrieveRelevantChunks, formatContextForPrompt } from "../../lib/rag";
+import { runCalendarAgent } from "../../lib/calendar-agent";
 
 const router = Router();
 
@@ -23,7 +24,33 @@ Características de tu personalidad:
 - Cuando das información estructurada, usas formato markdown para mayor claridad
 - Eres honesto sobre tus limitaciones y no inventas información
 
+Sub-agentes disponibles:
+- "calendar_agent": delega a este sub-agente CUALQUIER tarea relacionada con la agenda/calendario del usuario: consultar próximos eventos, crear/editar/eliminar publicaciones, pagos a proveedores, fechas importantes, reuniones o eventos personalizados, generar reportes y recordatorios. Pasa la solicitud original del usuario tal cual (incluye la fecha/hora exacta si la mencionó) en el campo "request". No intentes responder tú mismo sobre el calendario; siempre usa esta herramienta para no saturar tu contexto. Cuando recibas el resultado del sub-agente, preséntalo al usuario de forma natural y breve.
+
 Responde siempre de manera clara, concisa y útil.`;
+
+const MAIN_TOOLS = [
+  {
+    type: "function" as const,
+    function: {
+      name: "calendar_agent",
+      description:
+        "Delega al sub-agente de Calendario cualquier tarea de planificación: ver, crear, editar, eliminar eventos, generar reportes o recordatorios sobre publicaciones, pagos, reuniones, fechas importantes y eventos personalizados.",
+      parameters: {
+        type: "object",
+        properties: {
+          request: {
+            type: "string",
+            description:
+              "La solicitud del usuario tal cual, en su idioma original, conservando fechas/horas/títulos exactos.",
+          },
+        },
+        required: ["request"],
+      },
+    },
+  },
+];
+
 
 router.get("/conversations", async (req, res) => {
   const all = await db
@@ -187,39 +214,157 @@ router.post("/conversations/:id/messages", async (req, res) => {
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
 
+  const send = (data: Record<string, unknown>) => {
+    res.write(`data: ${JSON.stringify(data)}\n\n`);
+  };
+
+  let calendarMutated = false;
+  let calendarActions = 0;
   let fullResponse = "";
 
-  const stream = await openai.chat.completions.create({
-    model: "gpt-5.2",
-    max_completion_tokens: 8192,
-    messages: chatMessages,
-    stream: true,
-  });
+  type LoopMessage = {
+    role: "system" | "user" | "assistant" | "tool";
+    content?: string | null;
+    tool_calls?: Array<{
+      id: string;
+      type: "function";
+      function: { name: string; arguments: string };
+    }>;
+    tool_call_id?: string;
+  };
 
-  for await (const chunk of stream) {
-    const content = chunk.choices[0]?.delta?.content;
-    if (content) {
-      fullResponse += content;
-      res.write(`data: ${JSON.stringify({ content })}\n\n`);
+  const loopMessages: LoopMessage[] = chatMessages.map((m) => ({
+    role: m.role,
+    content: m.content,
+  }));
+
+  try {
+    for (let step = 0; step < 4; step++) {
+      // First: try with tools enabled, non-streaming to detect tool calls
+      const initial = await openai.chat.completions.create({
+        model: "gpt-5.2",
+        max_completion_tokens: 8192,
+        messages: loopMessages as Parameters<
+          typeof openai.chat.completions.create
+        >[0]["messages"],
+        tools: MAIN_TOOLS,
+        tool_choice: step === 0 ? "auto" : "auto",
+      });
+
+      const choice = initial.choices[0];
+      const msg = choice.message;
+
+      if (msg.tool_calls && msg.tool_calls.length > 0) {
+        loopMessages.push({
+          role: "assistant",
+          content: msg.content ?? "",
+          tool_calls: msg.tool_calls.map((tc) => ({
+            id: tc.id,
+            type: "function" as const,
+            function: {
+              name: tc.function.name,
+              arguments: tc.function.arguments,
+            },
+          })),
+        });
+
+        for (const call of msg.tool_calls) {
+          if (call.function.name === "calendar_agent") {
+            let parsed: { request?: string } = {};
+            try {
+              parsed = JSON.parse(call.function.arguments || "{}");
+            } catch {
+              /* ignore */
+            }
+            const subRequest = parsed.request || body.data.content;
+
+            send({
+              type: "agent_action",
+              agent: "calendar",
+              label: "Agente de Calendario activado",
+            });
+
+            const agentResult = await runCalendarAgent(subRequest, (label) => {
+              send({
+                type: "agent_action",
+                agent: "calendar",
+                label,
+              });
+              calendarActions++;
+            });
+
+            if (agentResult.mutated) calendarMutated = true;
+
+            loopMessages.push({
+              role: "tool",
+              tool_call_id: call.id,
+              content: JSON.stringify({
+                reply: agentResult.reply,
+                actions: agentResult.actions.map((a) => ({
+                  tool: a.tool,
+                  result: a.result,
+                })),
+                mutated: agentResult.mutated,
+              }),
+            });
+          } else {
+            loopMessages.push({
+              role: "tool",
+              tool_call_id: call.id,
+              content: JSON.stringify({ error: "Tool no soportada" }),
+            });
+          }
+        }
+        continue;
+      }
+
+      // No tool calls — stream the final answer
+      // We already have the text in msg.content; emit it as one chunk for simplicity
+      const finalText = msg.content ?? "";
+      if (finalText) {
+        fullResponse = finalText;
+        // Emit in small chunks for nicer UX
+        const chunkSize = 40;
+        for (let i = 0; i < finalText.length; i += chunkSize) {
+          send({ content: finalText.slice(i, i + chunkSize) });
+        }
+      }
+      break;
     }
+
+    if (!fullResponse) {
+      fullResponse =
+        "(Sin respuesta del modelo. Intenta reformular tu solicitud.)";
+      send({ content: fullResponse });
+    }
+
+    await db.insert(messages).values({
+      conversationId: params.data.id,
+      role: "assistant",
+      content: fullResponse,
+    });
+
+    if (existingMessages.length === 0 && fullResponse) {
+      const titlePreview = body.data.content.slice(0, 50);
+      await db
+        .update(conversations)
+        .set({ title: titlePreview })
+        .where(eq(conversations.id, params.data.id));
+    }
+
+    send({
+      done: true,
+      calendarMutated,
+      calendarActions,
+    });
+    res.end();
+  } catch (err) {
+    console.error("Chat loop failed:", err);
+    send({
+      error: err instanceof Error ? err.message : "Error en la conversación",
+    });
+    res.end();
   }
-
-  await db.insert(messages).values({
-    conversationId: params.data.id,
-    role: "assistant",
-    content: fullResponse,
-  });
-
-  if (existingMessages.length === 0 && fullResponse) {
-    const titlePreview = body.data.content.slice(0, 50);
-    await db
-      .update(conversations)
-      .set({ title: titlePreview })
-      .where(eq(conversations.id, params.data.id));
-  }
-
-  res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
-  res.end();
 });
 
 export default router;
