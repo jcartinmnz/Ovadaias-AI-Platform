@@ -1,7 +1,7 @@
 import { useListOpenaiConversations, useCreateOpenaiConversation, getListOpenaiConversationsQueryKey } from "@workspace/api-client-react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Plus, MessageSquare, Terminal, Database } from "lucide-react";
+import { Plus, MessageSquare, Terminal, Database, Sparkles } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -48,6 +48,15 @@ export function Sidebar() {
           >
             <Database className="w-4 h-4" />
             Knowledge Base
+          </Button>
+        </Link>
+        <Link href="/marketing">
+          <Button
+            className="w-full justify-start gap-2 border border-border/40 hover:bg-sidebar-accent"
+            variant="ghost"
+          >
+            <Sparkles className="w-4 h-4" />
+            Marketing Studio
           </Button>
         </Link>
       </div>
