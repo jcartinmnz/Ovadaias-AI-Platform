@@ -15,6 +15,8 @@ import {
   Mail,
   Bot,
   Webhook,
+  Send,
+  ShieldCheck,
 } from "lucide-react";
 import { waApi, type WhatsappSettings } from "@/lib/whatsapp-api";
 
@@ -27,6 +29,9 @@ export default function WhatsappSettingsPage() {
     status?: string;
     error?: string;
   } | null>(null);
+  const [testPhone, setTestPhone] = useState("");
+  const [testText, setTestText] = useState("");
+  const [testSending, setTestSending] = useState(false);
 
   const load = async () => {
     const s = await waApi.getSettings();
@@ -123,10 +128,91 @@ export default function WhatsappSettingsPage() {
                 </>
               )}
             </div>
+            <div className="space-y-2 pt-2">
+              <Label className="text-xs">Enviar mensaje de prueba</Label>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Número con código país (ej: 5491155512345)"
+                  value={testPhone}
+                  onChange={(e) => setTestPhone(e.target.value)}
+                  className="flex-1"
+                />
+                <Button
+                  onClick={async () => {
+                    if (!testPhone.trim()) {
+                      toast({
+                        title: "Falta número",
+                        description: "Ingresa un teléfono.",
+                        variant: "destructive",
+                      });
+                      return;
+                    }
+                    setTestSending(true);
+                    try {
+                      const r = await waApi.testSend(
+                        testPhone.trim(),
+                        testText.trim() || undefined,
+                      );
+                      if (r.ok) {
+                        toast({
+                          title: "Enviado",
+                          description: "Verifica WhatsApp en el destinatario.",
+                        });
+                      } else {
+                        toast({
+                          title: "Error",
+                          description: r.error || "Falló el envío",
+                          variant: "destructive",
+                        });
+                      }
+                    } catch (e) {
+                      toast({
+                        title: "Error",
+                        description: e instanceof Error ? e.message : "Falló",
+                        variant: "destructive",
+                      });
+                    } finally {
+                      setTestSending(false);
+                    }
+                  }}
+                  disabled={testSending}
+                >
+                  <Send className="w-4 h-4 mr-2" />
+                  {testSending ? "Enviando..." : "Probar"}
+                </Button>
+              </div>
+              <Input
+                placeholder="Texto opcional (default: mensaje de prueba)"
+                value={testText}
+                onChange={(e) => setTestText(e.target.value)}
+                className="text-xs"
+              />
+            </div>
           </Section>
 
           {/* Evolution */}
           <Section title="Evolution API" icon={<Webhook className="w-4 h-4" />}>
+            {(settings.envOverrides?.evolutionApiKey ||
+              settings.envOverrides?.evolutionBaseUrl ||
+              settings.envOverrides?.evolutionInstance ||
+              settings.envOverrides?.webhookSecret) && (
+              <div className="text-[11px] flex items-start gap-2 p-2 rounded border border-emerald-500/30 bg-emerald-500/10 text-emerald-200">
+                <ShieldCheck className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                <span>
+                  Algunos valores están sobreescritos por variables de entorno
+                  (recomendado para producción): {" "}
+                  {[
+                    settings.envOverrides.evolutionBaseUrl && "EVOLUTION_BASE_URL",
+                    settings.envOverrides.evolutionApiKey && "EVOLUTION_API_KEY",
+                    settings.envOverrides.evolutionInstance && "EVOLUTION_INSTANCE",
+                    settings.envOverrides.webhookSecret && "WHATSAPP_WEBHOOK_SECRET",
+                  ]
+                    .filter(Boolean)
+                    .join(", ")}
+                  . Estos valores tienen prioridad sobre los del formulario.
+                </span>
+              </div>
+            )}
             <Field label="Base URL (sin / final)">
               <Input
                 placeholder="https://evolution.tu-dominio.com"

@@ -22,6 +22,15 @@ export type WhatsappSettings = {
   notifyOnNewTicket: boolean;
   notifyOnHandoff: boolean;
   updatedAt: string;
+  envOverrides?: Partial<{
+    evolutionBaseUrl: boolean;
+    evolutionApiKey: boolean;
+    evolutionInstance: boolean;
+    webhookSecret: boolean;
+    smtpHost: boolean;
+    smtpPass: boolean;
+    emailFrom: boolean;
+  }>;
 };
 
 export type WaContact = {
@@ -139,6 +148,12 @@ export const waApi = {
     fetch(
       `${BASE}/whatsapp/tickets${status ? `?status=${encodeURIComponent(status)}` : ""}`,
     ).then(j<WaTicket[]>),
+  testSend: (phone: string, text?: string) =>
+    fetch(`${BASE}/whatsapp/settings/test-send`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone, text }),
+    }).then(j<{ ok: boolean; error?: string }>),
   updateTicket: (id: number, patch: Partial<WaTicket>) =>
     fetch(`${BASE}/whatsapp/tickets/${id}`, {
       method: "PATCH",

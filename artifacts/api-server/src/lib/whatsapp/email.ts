@@ -22,23 +22,36 @@ export async function sendNotificationEmail(
   if (options.event === "handoff" && s.notifyOnHandoff === false)
     return { ok: false, error: "muted" };
 
-  if (!s.smtpHost || !s.smtpPort || !s.emailFrom || !s.emailTo) {
+  // ENV overrides DB for sensitive bits.
+  const smtpHost = process.env.SMTP_HOST || s.smtpHost;
+  const smtpPort = process.env.SMTP_PORT
+    ? Number(process.env.SMTP_PORT)
+    : s.smtpPort;
+  const smtpSecure = process.env.SMTP_SECURE
+    ? process.env.SMTP_SECURE === "true"
+    : (s.smtpSecure ?? false);
+  const smtpUser = process.env.SMTP_USER || s.smtpUser;
+  const smtpPass = process.env.SMTP_PASS || s.smtpPass;
+  const emailFrom = process.env.EMAIL_FROM || s.emailFrom;
+  const emailTo = process.env.EMAIL_TO || s.emailTo;
+
+  if (!smtpHost || !smtpPort || !emailFrom || !emailTo) {
     return { ok: false, error: "smtp config incomplete" };
   }
 
   try {
     const transporter = nodemailer.createTransport({
-      host: s.smtpHost,
-      port: s.smtpPort,
-      secure: s.smtpSecure ?? false,
+      host: smtpHost,
+      port: smtpPort,
+      secure: smtpSecure,
       auth:
-        s.smtpUser && s.smtpPass
-          ? { user: s.smtpUser, pass: s.smtpPass }
+        smtpUser && smtpPass
+          ? { user: smtpUser, pass: smtpPass }
           : undefined,
     });
     await transporter.sendMail({
-      from: s.emailFrom,
-      to: s.emailTo,
+      from: emailFrom,
+      to: emailTo,
       subject: `[Ovadaias WhatsApp] ${subject}`,
       text: body,
       html: `<pre style="font-family:ui-monospace,Menlo,monospace;white-space:pre-wrap">${escapeHtml(body)}</pre>`,

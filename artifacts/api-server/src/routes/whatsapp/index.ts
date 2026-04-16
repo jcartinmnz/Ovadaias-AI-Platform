@@ -12,6 +12,7 @@ import { handleIncomingMessage } from "../../lib/whatsapp/pipeline";
 import {
   fetchInstanceStatus,
   getEvolutionConfig,
+  getWebhookSecret,
   sendText,
 } from "../../lib/whatsapp/evolution";
 
@@ -67,7 +68,41 @@ async function ensureSettingsRow() {
 
 router.get("/whatsapp/settings", async (_req, res) => {
   const s = await ensureSettingsRow();
-  res.json(maskSettings(s));
+  res.json({
+    ...maskSettings(s),
+    envOverrides: {
+      evolutionBaseUrl: !!process.env.EVOLUTION_BASE_URL,
+      evolutionApiKey: !!process.env.EVOLUTION_API_KEY,
+      evolutionInstance: !!process.env.EVOLUTION_INSTANCE,
+      webhookSecret: !!process.env.WHATSAPP_WEBHOOK_SECRET,
+      smtpHost: !!process.env.SMTP_HOST,
+      smtpPass: !!process.env.SMTP_PASS,
+      emailFrom: !!process.env.EMAIL_FROM,
+    },
+  });
+});
+
+// Test send: lets the user verify Evolution connectivity from the Settings UI.
+router.post("/whatsapp/settings/test-send", async (req, res) => {
+  const phone = String((req.body?.phone as string) ?? "").trim();
+  const text =
+    String((req.body?.text as string) ?? "").trim() ||
+    "✅ Prueba de Ovadaias: la integración con WhatsApp funciona.";
+  if (!phone) {
+    res.status(400).json({ ok: false, error: "phone requerido" });
+    return;
+  }
+  const cfg = await getEvolutionConfig();
+  if (!cfg) {
+    res.status(400).json({ ok: false, error: "Evolution no configurado" });
+    return;
+  }
+  const result = await sendText(cfg, phone, text);
+  if (!result.ok) {
+    res.status(502).json({ ok: false, error: result.error });
+    return;
+  }
+  res.json({ ok: true });
 });
 
 router.put("/whatsapp/settings", async (req, res) => {
@@ -147,12 +182,8 @@ function extractRateKey(body: Record<string, unknown>, ip: string) {
 }
 
 router.post("/whatsapp/webhook", async (req, res) => {
-  // Optional shared-secret check via query param or header
-  const settings = await db
-    .select()
-    .from(whatsappSettings)
-    .where(eq(whatsappSettings.id, 1));
-  const secret = settings[0]?.webhookSecret;
+  // Optional shared-secret check via query param or header (env first, DB fallback)
+  const secret = await getWebhookSecret();
   if (secret) {
     const provided =
       (req.query.secret as string | undefined) ||

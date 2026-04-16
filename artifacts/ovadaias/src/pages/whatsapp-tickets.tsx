@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Shell } from "@/components/layout/shell";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
@@ -164,6 +165,31 @@ export default function WhatsappTicketsPage() {
                     +{t.contact.phone}
                   </div>
                 )}
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="text-muted-foreground shrink-0">
+                    Encargado:
+                  </span>
+                  <Input
+                    className="h-7 text-xs"
+                    defaultValue={t.assignedTo ?? ""}
+                    placeholder="Nombre o email del responsable"
+                    onBlur={async (e) => {
+                      const v = e.target.value.trim();
+                      if (v === (t.assignedTo ?? "")) return;
+                      try {
+                        await waApi.updateTicket(t.id, { assignedTo: v });
+                        toast({ title: "Asignado actualizado" });
+                        await load();
+                      } catch (err) {
+                        toast({
+                          title: "Error",
+                          description: String(err),
+                          variant: "destructive",
+                        });
+                      }
+                    }}
+                  />
+                </div>
                 {t.summary && (
                   <p className="text-sm text-foreground/80 whitespace-pre-wrap">
                     {t.summary}

@@ -7,19 +7,41 @@ export type EvolutionConfig = {
   instance: string;
 };
 
+/**
+ * Resolve Evolution credentials. ENV takes precedence over DB so that
+ * production deployments can store secrets via the platform secret manager
+ * (`EVOLUTION_BASE_URL`, `EVOLUTION_API_KEY`, `EVOLUTION_INSTANCE`).
+ * The DB row remains as a developer convenience for non-secret values
+ * (or for self-hosted dev).
+ */
 export async function getEvolutionConfig(): Promise<EvolutionConfig | null> {
+  const envBase = process.env.EVOLUTION_BASE_URL;
+  const envKey = process.env.EVOLUTION_API_KEY;
+  const envInstance = process.env.EVOLUTION_INSTANCE;
   const [s] = await db
     .select()
     .from(whatsappSettings)
     .where(eq(whatsappSettings.id, 1));
-  if (!s || !s.evolutionBaseUrl || !s.evolutionApiKey || !s.evolutionInstance) {
-    return null;
-  }
+  const baseUrl = envBase || s?.evolutionBaseUrl || "";
+  const apiKey = envKey || s?.evolutionApiKey || "";
+  const instance = envInstance || s?.evolutionInstance || "";
+  if (!baseUrl || !apiKey || !instance) return null;
   return {
-    baseUrl: s.evolutionBaseUrl.replace(/\/$/, ""),
-    apiKey: s.evolutionApiKey,
-    instance: s.evolutionInstance,
+    baseUrl: baseUrl.replace(/\/$/, ""),
+    apiKey,
+    instance,
   };
+}
+
+export async function getWebhookSecret(): Promise<string | null> {
+  if (process.env.WHATSAPP_WEBHOOK_SECRET) {
+    return process.env.WHATSAPP_WEBHOOK_SECRET;
+  }
+  const [s] = await db
+    .select()
+    .from(whatsappSettings)
+    .where(eq(whatsappSettings.id, 1));
+  return s?.webhookSecret ?? null;
 }
 
 async function evoFetch(
