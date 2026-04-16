@@ -34,7 +34,7 @@ Spanish/English corporate AI agent with futuristic purple branding.
 
 - **Branding**: nuclear purple #6327EC, Orbitron + Exo 2 fonts, brand gradient on logo/headings, carbon-black background
 - **Chat**: Streaming chat UI calling `/api/openai/conversations/:id/messages` (SSE)
-- **Knowledge base** (`/knowledge`): Upload company documents (paste or file). Each document is split into ~1000-char overlapping chunks and indexed for retrieval.
+- **Knowledge base** (`/knowledge`): Upload company documents (paste, `.txt`/`.md`, `.pdf`, or `.docx`). Each document is split into ~1000-char overlapping chunks and indexed for retrieval. PDF parsing uses `pdf-parse` v2 (`PDFParse` class), DOCX uses `mammoth.extractRawText`.
 
 ### API server (`artifacts/api-server`)
 
@@ -43,7 +43,8 @@ Spanish/English corporate AI agent with futuristic purple branding.
 - **RAG**: Postgres full-text search in Spanish (`to_tsvector('spanish', ...)` with GIN index). Each user message triggers `retrieveRelevantChunks` which ranks by `ts_rank_cd` and injects the top results as additional context into the system prompt. We chose lexical FTS over vector embeddings because the Replit AI proxies do not expose embeddings endpoints and bundling local embedding models (e.g. `@xenova/transformers`) requires native modules (`sharp`, `onnxruntime-node`) whose post-install scripts are blocked in this environment.
 - **Routes**:
   - `GET /api/openai/documents` — list documents with chunk counts
-  - `POST /api/openai/documents` `{ title, content, source? }` — create + index document
+  - `POST /api/openai/documents` `{ title, content, source? }` — create + index document from raw text
+  - `POST /api/openai/documents/upload` (multipart, field `file`, optional `title`/`source`) — upload PDF/DOCX/TXT (max 25 MB)
   - `DELETE /api/openai/documents/:id` — cascade-delete document + chunks
   - `POST /api/openai/conversations` — create conversation
   - `POST /api/openai/conversations/:id/messages` — SSE stream of `{content}` chunks ending with `{done:true}`

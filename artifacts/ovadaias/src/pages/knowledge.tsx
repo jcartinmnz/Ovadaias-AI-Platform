@@ -43,6 +43,21 @@ async function deleteDoc(id: number) {
   if (!r.ok) throw new Error("Delete failed");
 }
 
+async function uploadFile(payload: { file: File; title?: string; source?: string }) {
+  const fd = new FormData();
+  fd.append("file", payload.file);
+  if (payload.title) fd.append("title", payload.title);
+  if (payload.source) fd.append("source", payload.source);
+  const r = await fetch(`${API}/upload`, { method: "POST", body: fd });
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({}));
+    throw new Error(err.error || "Upload failed");
+  }
+  return r.json();
+}
+
+const BINARY_EXT = /\.(pdf|docx)$/i;
+
 export default function KnowledgePage() {
   const qc = useQueryClient();
   const { toast } = useToast();
@@ -75,7 +90,29 @@ export default function KnowledgePage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["documents"] }),
   });
 
+  const fileUploadMutation = useMutation({
+    mutationFn: uploadFile,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["documents"] });
+      setTitle("");
+      setContent("");
+      setSource("");
+      toast({ title: "Documento añadido", description: "Ovadaias ya puede usar esta información." });
+    },
+    onError: (e: Error) => {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    },
+  });
+
   const handleFile = async (file: File) => {
+    if (BINARY_EXT.test(file.name) || file.type === "application/pdf" || file.type.includes("officedocument")) {
+      fileUploadMutation.mutate({
+        file,
+        title: title.trim() || file.name.replace(/\.[^.]+$/, ""),
+        source: source.trim() || file.name,
+      });
+      return;
+    }
     const text = await file.text();
     setContent(text);
     if (!title) setTitle(file.name.replace(/\.[^.]+$/, ""));
@@ -137,7 +174,7 @@ export default function KnowledgePage() {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".txt,.md,.csv,.json,.html,.xml,.log,text/*"
+                accept=".txt,.md,.csv,.json,.html,.xml,.log,.pdf,.docx,text/*,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                 className="hidden"
                 onChange={(e) => {
                   const f = e.target.files?.[0];
@@ -150,10 +187,20 @@ export default function KnowledgePage() {
                   type="button"
                   variant="outline"
                   onClick={() => fileInputRef.current?.click()}
+                  disabled={fileUploadMutation.isPending}
                   className="flex-1 gap-2"
                 >
-                  <Upload className="w-4 h-4" />
-                  Cargar archivo
+                  {fileUploadMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Procesando...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-4 h-4" />
+                      Cargar archivo (PDF, DOCX, TXT)
+                    </>
+                  )}
                 </Button>
                 <Button
                   type="submit"

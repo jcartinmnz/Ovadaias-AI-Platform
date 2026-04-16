@@ -15,10 +15,11 @@ export async function parseFileBuffer(
 
   if (isPdf) {
     const mod = (await import("pdf-parse")) as unknown as {
-      default: (b: Buffer) => Promise<{ text: string }>;
+      PDFParse: new (opts: { data: Buffer }) => { getText: () => Promise<{ text: string }> };
     };
-    const data = await mod.default(buffer);
-    return { text: data.text || "", kind: "pdf" };
+    const parser = new mod.PDFParse({ data: buffer });
+    const result = await parser.getText();
+    return { text: result.text || "", kind: "pdf" };
   }
 
   if (isDocx) {
