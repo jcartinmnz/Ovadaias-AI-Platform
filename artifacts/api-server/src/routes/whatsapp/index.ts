@@ -9,6 +9,7 @@ import {
   whatsappTickets,
 } from "@workspace/db";
 import { handleIncomingMessage } from "../../lib/whatsapp/pipeline";
+import { sendNotificationEmail } from "../../lib/whatsapp/email";
 import {
   fetchInstanceStatus,
   getEvolutionConfig,
@@ -201,17 +202,19 @@ router.post("/whatsapp/webhook", async (req, res) => {
     return;
   }
 
-  const event = String(body.event || "");
-  void event;
+  const event = String(body.event || "").toLowerCase();
   const data = (body.data ?? body) as Record<string, unknown>;
 
-  // Only process upsert/incoming message events
-  if (
-    event &&
-    !event.toLowerCase().includes("messages.upsert") &&
-    !event.toLowerCase().includes("messages_upsert") &&
-    !event.toLowerCase().includes("message")
-  ) {
+  // Strict allowlist: only inbound message upsert events are processed.
+  // Anything else (presence, status, connection update, message ACKs, etc.)
+  // is acknowledged but ignored.
+  const ALLOWED_EVENTS = new Set([
+    "messages.upsert",
+    "messages_upsert",
+    "message.upsert",
+    "message_upsert",
+  ]);
+  if (event && !ALLOWED_EVENTS.has(event)) {
     res.json({ ok: true, ignored: event });
     return;
   }
@@ -550,22 +553,35 @@ router.post("/whatsapp/tickets", async (req, res) => {
     res.status(400).json({ error: "conversationId y title requeridos" });
     return;
   }
+  const summary =
+    typeof body.summary === "string" ? body.summary.slice(0, 4000) : null;
+  const priority =
+    typeof body.priority === "string" &&
+    ["low", "normal", "high", "urgent"].includes(body.priority)
+      ? body.priority
+      : "normal";
+  const category =
+    typeof body.category === "string" ? body.category.slice(0, 100) : null;
   const [t] = await db
     .insert(whatsappTickets)
     .values({
       conversationId,
       title: title.slice(0, 200),
-      summary: typeof body.summary === "string" ? body.summary.slice(0, 4000) : null,
-      priority:
-        typeof body.priority === "string" &&
-        ["low", "normal", "high", "urgent"].includes(body.priority)
-          ? body.priority
-          : "normal",
-      category: typeof body.category === "string" ? body.category.slice(0, 100) : null,
+      summary,
+      priority,
+      category,
       createdBy: "human",
       status: "open",
     })
     .returning();
+
+  // Fire-and-forget notification. Honors notifyOnNewTicket toggle.
+  void sendNotificationEmail(
+    `Nuevo ticket #${t.id}: ${title}`,
+    `Origen: humano (creado desde Inbox)\nPrioridad: ${priority}${category ? `\nCategoría: ${category}` : ""}\n\n${summary ?? "(sin resumen)"}`,
+    { event: "new_ticket" },
+  ).catch((e) => console.error("ticket email failed:", e));
+
   res.status(201).json({ ok: true, id: t.id });
 });
 
