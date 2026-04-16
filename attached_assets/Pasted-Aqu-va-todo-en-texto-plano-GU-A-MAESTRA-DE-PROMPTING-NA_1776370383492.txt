@@ -1,0 +1,163 @@
+Aquí va todo en texto plano:
+
+---
+
+# GUÍA MAESTRA DE PROMPTING — NANO BANANA PRO 2 + GPT-5.2
+### Para agencias de marketing
+
+---
+
+## LA FÓRMULA MAESTRA
+
+[ROL] + [CONTEXTO] + [TAREA ESPECÍFICA] + [FORMATO] + [RESTRICCIONES] + [CRITERIO DE ÉXITO]
+
+**ROL:** Define quién es el modelo. "Actúa como un director creativo de una agencia de lujo con 15 años de experiencia en branding." Cuanto más específico, mejor output.
+
+**Contexto:** Situación actual: cliente, industria, audiencia, problema. Sin contexto el modelo adivina. Con contexto, razona.
+
+**Tarea específica:** Verbo de acción concreto: genera, redacta, analiza, reformula, compara. Evita verbos ambiguos como "ayúdame con".
+
+**Formato + restricciones:** Longitud, estructura, tono, lo que NO debe incluir, idioma, plataforma destino (Instagram, LinkedIn, email).
+
+---
+
+## LOS 3 NIVELES DE PROMPT
+
+**Nivel 1 — Básico (para outputs rápidos)**
+Sujeto + acción + escena. Ejemplo: "Crea una publicación de Instagram para un reloj de lujo dirigida a ejecutivos de 35-50 años."
+
+**Nivel 2 — Detallado (para campañas)**
+Fórmula completa con brief del cliente. Incluye posicionamiento de marca, competidores a diferenciarse, propuesta de valor única.
+
+**Nivel 3 — Conversacional (para iteración)**
+Generas, evalúas, ajustas. "Eso está 80% bien, cambia el tono a más aspiracional y acorta a 3 líneas." No re-generas desde cero.
+
+---
+
+## NANO BANANA PRO 2 — GENERACIÓN DE IMÁGENES
+
+### Qué es
+Modelo de generación de imágenes de Google (Gemini 3.1 Flash Image). Razona antes de renderizar — piensa en composición, física, iluminación. No es diffusion clásico, es un director creativo.
+
+### Anatomía de un prompt de imagen
+
+[SUJETO] + [ACCIÓN] + [ESCENARIO/LOCACIÓN] + [ESTILO VISUAL] + [ILUMINACIÓN] + [TIPO DE CÁMARA/PLANO] + [TEXTO EN IMAGEN si aplica]
+
+### Especificaciones técnicas
+
+**Planos y cámara:**
+cinematic wide shot, close-up, bird's eye view, Dutch angle, low angle shot, macro photography, editorial portrait
+
+**Iluminación:**
+golden hour, soft studio lighting, high-key white background, dramatic chiaroscuro, neon backlight, natural diffused window light
+
+**Estilos visuales:**
+photorealistic 4K, flat design infographic, editorial magazine, product photography, cinematic film grain, minimalist brand identity
+
+**Texto en imagen:**
+Usa comillas: "SALE 50%" — Especifica fuente: bold sans-serif, italic serif, Century Gothic. Primero genera el texto como copy, luego pide la imagen con él incluido.
+
+### Do vs Don't
+
+SÍ — Prompt de producto de lujo:
+"Flat lay product photography of a matte black perfume bottle on brushed marble surface. Soft side lighting from the left, shallow depth of field. Style: luxury editorial, VOGUE aesthetic. Include text 'EAU DE PARFUM' in thin elegant serif font at the bottom right corner."
+
+NO — Tag soup:
+"luxury, dark, 4k, realistic, expensive, perfume, bottle"
+El modelo razona, no matchea keywords. Los tag soups no funcionan.
+
+### Hack de texto en imagen
+
+Paso 1: "Genera 5 variantes de copy para un anuncio de finanzas personales, menos de 8 palabras cada uno."
+Paso 2: "Ahora crea una imagen: ejecutivo frente a skyline nocturno, estilo editorial financiero, con el texto 'Tu dinero trabaja mientras duermes' en bold white sans-serif en la parte inferior."
+Resultado: texto legible y bien integrado, sin caracteres corruptos.
+
+---
+
+## GPT-5.2 — TEXTO Y ESTRATEGIA
+
+### Qué cambió para prompting
+
+**Menos workarounds necesarios:**
+Donde antes escribías "IMPORTANTE: responde SOLO en JSON, nada más, sin backticks", ahora basta con "Responde en JSON válido solamente."
+
+**Reasoning effort:**
+GPT-5.2 Thinking tiene parámetro de esfuerzo. Para briefs creativos: standard. Para análisis competitivo o estrategia profunda: xhigh.
+
+**Contexto largo nativo:**
+Ventana de 400K tokens. Puedes meter el brand book completo, histórico de campañas, perfiles de buyer persona, todo en un solo prompt.
+
+**Tool use preciso:**
+Los agentes de marketing (búsqueda, análisis, publicación) son más confiables con GPT-5.2.
+
+### Estructura de system prompt para agencia
+
+IDENTIDAD: Eres [nombre], estratega de marketing de [agencia].
+CLIENTE ACTIVO: [nombre], industria [sector], audiencia [descripción].
+POSICIONAMIENTO: [propuesta de valor única del cliente].
+VOZ DE MARCA: [3-5 adjetivos que describen el tono].
+PROHIBIDO: [lista de lo que jamás debe decir o mostrar].
+FORMATO DEFAULT: [cómo estructuras siempre las respuestas].
+
+Este system prompt va fijo para toda una sesión o cliente. Los prompts individuales solo añaden la tarea específica.
+
+### Prompt de análisis competitivo
+
+"Actúa como senior strategist. Analiza el posicionamiento de [marca] en el mercado latinoamericano.
+Contexto: [pegar brand brief].
+Tarea: Identifica 3 brechas de oportunidad que no están siendo explotadas por los competidores [A, B, C].
+Formato: Para cada brecha: nombre, evidencia de mercado, propuesta táctica, KPI de validación.
+Restricción: Basa solo en hechos verificables, señala cuando estés inferiendo."
+
+---
+
+## TEMPLATES POR TIPO DE ENTREGABLE
+
+**Copy para redes sociales (GPT-5.2):**
+"Escribe 5 variantes de caption para Instagram de [marca]. Audiencia: [descripción]. Tono: [adjetivos]. Incluir CTA. Máximo 150 caracteres por variante. Variante 1: emocional, V2: informativa, V3: humorística, V4: aspiracional, V5: urgencia."
+
+**Imagen de producto (Nano Banana Pro 2):**
+"Professional product photography of [producto] on [superficie]. [Iluminación]. Shot with [tipo de lente]. Brand colors: [colores]. Include packshot label '[texto]' in [estilo de fuente]. Aspect ratio: [16:9 / 1:1 / 9:16]. Resolution: 4K."
+
+**Infografía de datos (Nano Banana Pro 2):**
+"Create a clean data infographic titled '[título]'. Include: [datos específicos con números]. Style: [minimalista / colorful / corporate]. Primary color: [hex o descripción]. Use bold readable sans-serif font. White background, organized grid layout."
+
+**Estrategia de campaña (GPT-5.2 Thinking):**
+"Desarrolla una estrategia de campaña de 30 días para [objetivo] de [marca]. Incluye: eje creativo, calendario de contenido semana a semana, mix de canales, presupuesto sugerido por canal, KPIs y métricas de éxito. Target: [descripción audiencia]."
+
+**Brief creativo (GPT-5.2):**
+"Transforma este input del cliente: [pegar brief desorganizado] en un brief creativo estructurado con: problema de marketing, insight del consumidor, propuesta de valor, mandatorios, reason to believe, tonality guide."
+
+**A/B copy testing (GPT-5.2):**
+"Genera 2 versiones de subject line para email de [campaña]. Versión A: basada en curiosidad. Versión B: basada en beneficio directo. Para cada una: subject (máx 50 chars), preheader (máx 90 chars), hipótesis de por qué funcionará."
+
+---
+
+## FLUJO COMBINADO NANO BANANA + GPT-5.2
+
+1. Estrategia (GPT-5.2 Thinking): Brief → posicionamiento → mensajes clave → copy.
+2. Visual (Nano Banana Pro 2): Usa el copy generado como referencia de texto en imagen.
+3. Iteración (conversacional): "Ese copy está bien, cambia el tono. Esa imagen está 80% — ajusta la iluminación a atardecer."
+4. Variantes (batch): "Genera 5 formatos del mismo concepto: story, post cuadrado, banner horizontal, thumbnail YouTube, email header."
+
+---
+
+## LOS 8 ERRORES MÁS COMUNES
+
+1. Tag soup en imágenes: "luxury, dark, 4K, model, expensive" — el modelo razona, no matchea. Usa oraciones completas descriptivas.
+
+2. Sin rol ni contexto: "Escríbeme un post de Instagram." Sin saber quién habla, a quién, con qué voz, el output es genérico e inservible.
+
+3. Re-generar en lugar de editar: Cuando algo está 80% bien, no empieces de cero. Di exactamente qué cambiar. Ambos modelos son excelentes en edición conversacional.
+
+4. Texto en imagen sin preparación: Pedir texto en imagen sin especificar fuente, posición, color y sin generar el copy primero. Resultado: texto ilegible o mal ubicado.
+
+5. Prompts largos sin estructura: Un párrafo de 300 palabras sin separación de secciones. Usa etiquetas: CONTEXTO:, TAREA:, FORMATO:, RESTRICCIONES:.
+
+6. No especificar formato de output: "Dame ideas de campaña." ¿Cuántas? ¿Con qué estructura? ¿Con KPIs o sin ellos? El modelo completará desde su criterio, no el tuyo.
+
+7. Ignorar aspect ratio: Nano Banana Pro 2 soporta 16:9, 9:16, 1:1, 4:5 y más. No especificarlo = imagen que no sirve para ningún canal directamente.
+
+8. Usar workarounds de GPT-4 en GPT-5.2: Frases como "IMPORTANTE: SOLO JSON, NADA MÁS, NO AÑADAS TEXTO" ya no son necesarias. Añaden ruido. GPT-5.2 sigue instrucciones directas.
+
+---
