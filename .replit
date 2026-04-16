@@ -26,3 +26,8 @@ externalPort = 80
 [[ports]]
 localPort = 25903
 externalPort = 3000
+
+[userenv]
+
+[userenv.shared]
+NEON_DATABASE_URL = "postgresql://neondb_owner:npg_nzb1a5frmWDI@ep-autumn-butterfly-aj01wqcw-pooler.c-3.us-east-2.aws.neon.tech/neondb?channel_binding=require&sslmode=require"
