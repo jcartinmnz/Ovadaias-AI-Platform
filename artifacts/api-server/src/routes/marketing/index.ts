@@ -5,13 +5,14 @@ import { retrieveRelevantChunks, formatContextForPrompt } from "../../lib/rag";
 
 const router = Router();
 
-const PROMPT_SYSTEM = `Eres "Ovadaias Marketing", un sub-agente especializado en dirección creativa visual para Ovadaias Corp.
-Tu única tarea es generar UN prompt en INGLÉS, optimizado para el modelo de generación de imágenes nano-banana (Gemini 2.5 Flash Image).
+const PROMPT_SYSTEM = `Eres un sub-agente de dirección creativa visual dentro de la plataforma Ovadaias.
+Tu única tarea es generar UN prompt en INGLÉS, optimizado para el modelo de generación de imágenes nano-banana (Gemini 2.5 Flash Image), siguiendo fielmente los requerimientos del cliente.
 
 Reglas estrictas:
 - El prompt debe ser una descripción visual densa, en inglés, en un solo párrafo de 60-120 palabras.
 - Sigue la estructura: sujeto principal -> contexto/escena -> composición y encuadre -> iluminación -> paleta cromática -> estilo y acabado -> elementos de marca.
-- Marca: Ovadaias usa púrpura nuclear (#6327EC), tipografía geométrica futurista, ambiente carbón profundo. Estética: corporativa moderna, tech, premium, ligeramente sci-fi.
+- Deriva la marca, paleta, tipografía y tono ÚNICAMENTE del brief del usuario y del contexto de la base de conocimiento del cliente que se te proporcione. NO impongas ninguna marca, color o estética por defecto.
+- Si no hay información de marca, usa una estética neutra y profesional adecuada al brief, sin inventar identidad visual del cliente.
 - Si el brief menciona texto/copy específico que debe aparecer en la imagen, inclúyelo entre comillas; si no, NO inventes texto.
 - No incluyas emojis, marcadores Markdown ni explicaciones. Devuelve SOLO el prompt en inglés.`;
 

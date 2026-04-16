@@ -167,9 +167,9 @@ export default function MarketingPage() {
                 )}
               </Button>
               <p className="text-[10px] text-muted-foreground font-mono leading-relaxed">
-                Ovadaias enriquece tu brief con la base de conocimiento, redacta un prompt
-                visual detallado en inglés y lo entrega al modelo nano-banana
-                (gemini-2.5-flash-image).
+                El sub-agente toma tu brief y el contexto de tu base de conocimiento,
+                redacta un prompt visual detallado en inglés según los requerimientos
+                del cliente y lo entrega al modelo nano-banana (gemini-2.5-flash-image).
               </p>
             </form>
 
