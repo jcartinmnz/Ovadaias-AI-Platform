@@ -4,8 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Plus, MessageSquare, Terminal, Database, Sparkles, Calendar } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useQueryClient } from "@tanstack/react-query";
-import { ClockCalendar } from "@/components/clock-calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 export function Sidebar() {
   const { data: conversations, isLoading } = useListOpenaiConversations();
@@ -61,24 +59,15 @@ export function Sidebar() {
             Marketing Studio
           </Button>
         </Link>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              className="w-full justify-start gap-2 border border-border/40 hover:bg-sidebar-accent"
-              variant="ghost"
-            >
-              <Calendar className="w-4 h-4" />
-              Calendar
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent
-            side="right"
-            align="start"
-            className="w-72 p-0 border-border/40 bg-popover"
+        <Link href="/calendar">
+          <Button
+            className="w-full justify-start gap-2 border border-border/40 hover:bg-sidebar-accent"
+            variant="ghost"
           >
-            <ClockCalendar />
-          </PopoverContent>
-        </Popover>
+            <Calendar className="w-4 h-4" />
+            Calendar
+          </Button>
+        </Link>
       </div>
 
       <ScrollArea className="flex-1 px-3">
