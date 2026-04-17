@@ -118,7 +118,10 @@ export function Sidebar() {
   const { toast } = useToast();
 
   const [projects, setProjects] = useState<ChatProject[]>([]);
-  const [collapsed, setCollapsed] = useState<Record<number | "none", boolean>>({});
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
+  const [collapsed, setCollapsed] = useState<
+    Partial<Record<number | "none", boolean>>
+  >({});
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<ChatProject | null>(null);
 
@@ -210,23 +213,45 @@ export function Sidebar() {
     setCollapsed((s) => ({ ...s, [key]: !s[key] }));
 
   return (
-    <div className="w-64 h-full bg-sidebar border-r border-sidebar-border flex flex-col">
-      <div className="p-4 border-b border-sidebar-border flex items-center justify-between">
+    <div
+      className={
+        "h-full bg-sidebar border-r border-sidebar-border flex flex-col transition-[width] duration-200 ease-linear overflow-hidden " +
+        (sidebarCollapsed ? "w-16" : "w-64")
+      }
+    >
+      <div className="p-4 border-b border-sidebar-border flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 text-primary">
           <Terminal className="w-5 h-5" />
-          <span
-            className="font-bold tracking-[0.2em] text-sidebar-foreground"
-            style={{
-              fontFamily: "var(--app-font-display)",
-              backgroundImage: "var(--brand-gradient)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-              backgroundClip: "text",
-            }}
-          >
-            OVADAIAS
-          </span>
+          {!sidebarCollapsed && (
+            <span
+              className="font-bold tracking-[0.2em] text-sidebar-foreground"
+              style={{
+                fontFamily: "var(--app-font-display)",
+                backgroundImage: "var(--brand-gradient)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+              }}
+            >
+              OVADAIAS
+            </span>
+          )}
         </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 shrink-0 border border-border/30 hover:bg-sidebar-accent"
+          onClick={() => setSidebarCollapsed((v) => !v)}
+          aria-label={sidebarCollapsed ? "Expandir barra lateral" : "Retraer barra lateral"}
+          title={sidebarCollapsed ? "Expandir barra lateral" : "Retraer barra lateral"}
+        >
+          <ChevronRight
+            className={
+              "h-4 w-4 transition-transform duration-200 " +
+              (sidebarCollapsed ? "rotate-180" : "")
+            }
+          />
+        </Button>
       </div>
 
       <div className="p-3 space-y-2">
@@ -234,42 +259,46 @@ export function Sidebar() {
           onClick={() => handleNewChat(null)}
           className="w-full justify-start gap-2 bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary-foreground border border-primary/20"
           variant="outline"
+          title={sidebarCollapsed ? "Nuevo chat" : undefined}
         >
           <Plus className="w-4 h-4" />
-          New Chat
+          {!sidebarCollapsed && "New Chat"}
         </Button>
         <Link href="/knowledge">
           <Button
             className="w-full justify-start gap-2 border border-border/40 hover:bg-sidebar-accent"
             variant="ghost"
+            title={sidebarCollapsed ? "Knowledge Base" : undefined}
           >
             <Database className="w-4 h-4" />
-            Knowledge Base
+            {!sidebarCollapsed && "Knowledge Base"}
           </Button>
         </Link>
         <Link href="/marketing">
           <Button
             className="w-full justify-start gap-2 border border-border/40 hover:bg-sidebar-accent"
             variant="ghost"
+            title={sidebarCollapsed ? "Marketing Studio" : undefined}
           >
             <Sparkles className="w-4 h-4" />
-            Marketing Studio
+            {!sidebarCollapsed && "Marketing Studio"}
           </Button>
         </Link>
         <Link href="/calendar">
           <Button
             className="w-full justify-start gap-2 border border-border/40 hover:bg-sidebar-accent"
             variant="ghost"
+            title={sidebarCollapsed ? "Calendar" : undefined}
           >
             <Calendar className="w-4 h-4" />
-            Calendar
+            {!sidebarCollapsed && "Calendar"}
           </Button>
         </Link>
-        <WhatsappNavLinks />
-        <RemindersBell />
+        {!sidebarCollapsed && <WhatsappNavLinks />}
+        {!sidebarCollapsed && <RemindersBell />}
       </div>
 
-      <ScrollArea className="flex-1 px-3">
+      <ScrollArea className={"flex-1 px-3 " + (sidebarCollapsed ? "hidden" : "")}>
         <div className="space-y-1 pb-4">
           <div className="flex items-center justify-between px-2 mt-2 mb-2">
             <div className="text-xs font-mono text-muted-foreground uppercase tracking-wider">
