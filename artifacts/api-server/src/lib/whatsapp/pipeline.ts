@@ -10,11 +10,13 @@ import {
   getEvolutionConfig,
   getMediaBase64,
   jidToPhone,
+  sendMedia,
   sendText,
 } from "./evolution";
 import { describeImageBase64, transcribeAudioBase64 } from "./multimedia";
 import { runCustomerServiceAgent } from "./agent";
 import { sendNotificationEmail } from "./email";
+import { safeFetchMedia } from "./safe-fetch";
 
 type IncomingMessage = {
   /** Evolution v2 webhook payload (data.key, data.message, data.messageType, etc.) */
@@ -268,10 +270,60 @@ export async function handleIncomingMessage(payload: IncomingMessage): Promise<{
       return { ok: true, conversationId: conv.id, replied: false };
     }
 
+    const cfgOut = await getEvolutionConfig();
+
+    // Send any media attachments queued by the agent (before/with the reply text).
+    // We use safeFetchMedia to harden against SSRF: the URL comes from an LLM
+    // tool call and could be coaxed by user input into pointing at internal
+    // services or cloud metadata endpoints.
+    for (const media of result.mediaToSend) {
+      const fetched = await safeFetchMedia(media.url);
+      if (!fetched.ok) {
+        console.error("Agent media fetch rejected:", media.url, fetched.error);
+        continue;
+      }
+      const base64 = fetched.buffer.toString("base64");
+      const mime: string | null = media.mimetype ?? fetched.mimetype ?? null;
+      if (cfgOut) {
+        const sendRes = await sendMedia(cfgOut, phone, {
+          mediatype: media.mediatype,
+          media: base64,
+          caption: media.caption,
+          fileName: media.fileName,
+          mimetype: mime ?? undefined,
+        });
+        if (!sendRes.ok) {
+          console.error("Evolution sendMedia failed:", sendRes.error);
+          continue;
+        }
+      }
+      const preview =
+        media.caption ||
+        media.fileName ||
+        (media.mediatype === "image" ? "[Imagen enviada]" : "[Documento enviado]");
+      await db.insert(whatsappMessages).values({
+        conversationId: conv.id,
+        direction: "out",
+        sender: "bot",
+        messageType: media.mediatype,
+        content: media.caption || media.fileName || null,
+        mediaBase64: base64,
+        mediaMimeType: mime,
+        mediaUrl: media.url,
+      });
+      await db
+        .update(whatsappConversations)
+        .set({
+          lastMessageAt: new Date(),
+          lastMessagePreview: preview.slice(0, 240),
+          updatedAt: new Date(),
+        })
+        .where(eq(whatsappConversations.id, conv.id));
+    }
+
     if (result.reply) {
-      const cfg = await getEvolutionConfig();
-      if (cfg) {
-        const send = await sendText(cfg, phone, result.reply);
+      if (cfgOut) {
+        const send = await sendText(cfgOut, phone, result.reply);
         if (!send.ok) console.error("Evolution send failed:", send.error);
       }
       await db.insert(whatsappMessages).values({

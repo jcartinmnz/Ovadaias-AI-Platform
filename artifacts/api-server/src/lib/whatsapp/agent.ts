@@ -10,11 +10,20 @@ import {
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { retrieveRelevantChunks, formatContextForPrompt } from "../rag";
 
+export type AgentMediaAttachment = {
+  url: string;
+  mediatype: "image" | "document";
+  caption?: string;
+  fileName?: string;
+  mimetype?: string;
+};
+
 export type CSAgentResult = {
   reply: string;
   shouldHandoff: boolean;
   handoffReason?: string;
   ticketsCreated: number[];
+  mediaToSend: AgentMediaAttachment[];
   actions: Array<{ tool: string; args: unknown; result: unknown }>;
 };
 
@@ -116,6 +125,41 @@ const TOOLS = [
   {
     type: "function" as const,
     function: {
+      name: "send_media_attachment",
+      description:
+        "Envía al cliente por WhatsApp una imagen o un documento (PDF, etc.) accesible desde una URL pública. Úsala cuando un texto no sea suficiente: catálogos, instructivos, comprobantes, fichas técnicas, fotos de productos, mapas, etc. La URL debe venir de una fuente confiable (preferentemente de la base de conocimiento o un dominio corporativo). Tras llamar esta herramienta, también responde con un breve mensaje de texto describiendo qué le enviaste.",
+      parameters: {
+        type: "object",
+        properties: {
+          url: {
+            type: "string",
+            description:
+              "URL pública del archivo. DEBE empezar por https:// (no se aceptan http ni hosts internos). Debe ser accesible desde internet.",
+          },
+          mediatype: {
+            type: "string",
+            enum: ["image", "document"],
+            description:
+              "'image' para fotos/JPG/PNG, 'document' para PDFs y otros archivos.",
+          },
+          caption: {
+            type: "string",
+            description:
+              "Texto corto opcional que acompaña al archivo (máx. 500 caracteres).",
+          },
+          fileName: {
+            type: "string",
+            description:
+              "Nombre del archivo (recomendado para documentos). Ej: 'catalogo-2025.pdf'.",
+          },
+        },
+        required: ["url", "mediatype"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
       name: "save_contact_note",
       description:
         "Guarda una nota sobre el contacto (preferencias, datos relevantes para futuras conversaciones).",
@@ -144,6 +188,7 @@ Reglas críticas:
 - Para cualquier pregunta sobre la empresa, sus productos, servicios, políticas, precios, horarios, etc., USA primero la herramienta search_knowledge_base. No inventes información.
 - Si no encuentras información suficiente o la consulta requiere autorización humana, usa request_human_handoff.
 - Cuando el cliente reporta un problema concreto que necesita seguimiento, crea un ticket con create_ticket (con título, resumen, prioridad y categoría).
+- Si la respuesta natural incluye una imagen o un documento (catálogos, fotos de productos, instructivos, fichas técnicas, comprobantes), usa send_media_attachment con la URL pública del archivo. La URL debe estar respaldada por la base de conocimiento; nunca inventes URLs. Después de enviar el archivo, complementa con un mensaje breve de texto.
 - Sé breve y conversacional para WhatsApp: respuestas cortas, párrafos cortos, no uses tablas largas. Sí puedes usar emojis con moderación.
 - Nunca prometas plazos exactos sin confirmar con un humano.
 - Si el cliente envía audio o imagen, ya recibiste su contenido transcrito/descrito al inicio del mensaje del usuario.
@@ -226,6 +271,7 @@ export async function runCustomerServiceAgent(input: {
 
   const actions: CSAgentResult["actions"] = [];
   const ticketsCreated: number[] = [];
+  const mediaToSend: AgentMediaAttachment[] = [];
   let shouldHandoff = false;
   let handoffReason: string | undefined;
 
@@ -378,6 +424,29 @@ export async function runCustomerServiceAgent(input: {
           } catch (e) {
             result = { error: e instanceof Error ? e.message : "schedule error" };
           }
+        } else if (call.function.name === "send_media_attachment") {
+          const url = String(args.url || "").trim();
+          const mediatype =
+            args.mediatype === "document" ? "document" : "image";
+          const caption = args.caption
+            ? String(args.caption).slice(0, 500)
+            : undefined;
+          const fileName = args.fileName
+            ? String(args.fileName).slice(0, 200)
+            : undefined;
+          if (!/^https:\/\//i.test(url)) {
+            result = {
+              error:
+                "url debe empezar por https:// (no se aceptan URLs http ni de redes internas)",
+            };
+          } else {
+            mediaToSend.push({ url, mediatype, caption, fileName });
+            result = {
+              ok: true,
+              queued: true,
+              note: "El archivo se enviará al cliente al final del turno.",
+            };
+          }
         } else if (call.function.name === "save_contact_note") {
           const note = String(args.note || "").slice(0, 1000);
           if (note) {
@@ -408,6 +477,7 @@ export async function runCustomerServiceAgent(input: {
       shouldHandoff,
       handoffReason,
       ticketsCreated,
+      mediaToSend,
       actions,
     };
   }
@@ -418,6 +488,7 @@ export async function runCustomerServiceAgent(input: {
     shouldHandoff: true,
     handoffReason: "Se agotaron los pasos del agente",
     ticketsCreated,
+    mediaToSend,
     actions,
   };
 }

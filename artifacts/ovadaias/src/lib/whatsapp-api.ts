@@ -140,6 +140,15 @@ export const waApi = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text }),
     }).then(j<{ ok: boolean }>),
+  sendMedia: (id: number, file: File, caption?: string) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    if (caption && caption.trim()) fd.append("caption", caption.trim());
+    return fetch(`${BASE}/whatsapp/conversations/${id}/send-media`, {
+      method: "POST",
+      body: fd,
+    }).then(j<{ ok: boolean }>);
+  },
   unreadCount: () =>
     fetch(`${BASE}/whatsapp/conversations/unread-count`).then(
       j<{ count: number }>,

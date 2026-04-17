@@ -1,4 +1,5 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
+import multer from "multer";
 import { and, asc, desc, eq, ne, or, sql } from "drizzle-orm";
 import { requireAuth } from "../../middlewares/requireAuth";
 import {
@@ -15,10 +16,27 @@ import {
   fetchInstanceStatus,
   getEvolutionConfig,
   getWebhookSecret,
+  sendMedia,
   sendText,
 } from "../../lib/whatsapp/evolution";
 
 const router = Router();
+
+// 16MB cap aligns with WhatsApp's media limit for most types.
+const mediaUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 16 * 1024 * 1024 },
+});
+
+function pickMediatype(
+  mime: string,
+): "image" | "video" | "audio" | "document" {
+  const m = (mime || "").toLowerCase();
+  if (m.startsWith("image/")) return "image";
+  if (m.startsWith("video/")) return "video";
+  if (m.startsWith("audio/")) return "audio";
+  return "document";
+}
 
 // Require auth for all WhatsApp routes EXCEPT the public webhook (which uses
 // its own shared-secret check). The whatsapp router is mounted at the parent's
@@ -466,6 +484,88 @@ router.post("/whatsapp/conversations/:id/send", async (req, res) => {
     .where(eq(whatsappConversations.id, id));
   res.json({ ok: true });
 });
+
+router.post(
+  "/whatsapp/conversations/:id/send-media",
+  mediaUpload.single("file"),
+  async (req, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) {
+      res.status(400).json({ error: "Invalid id" });
+      return;
+    }
+    const file = (req as Request & { file?: Express.Multer.File }).file;
+    if (!file) {
+      res.status(400).json({ error: "file requerido" });
+      return;
+    }
+    const caption = String(req.body?.caption ?? "").slice(0, 1024).trim();
+    const [conv] = await db
+      .select()
+      .from(whatsappConversations)
+      .where(eq(whatsappConversations.id, id));
+    if (!conv) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    const [contact] = await db
+      .select()
+      .from(whatsappContacts)
+      .where(eq(whatsappContacts.id, conv.contactId));
+    if (!contact) {
+      res.status(404).json({ error: "Contact not found" });
+      return;
+    }
+    const cfg = await getEvolutionConfig();
+    if (!cfg) {
+      res.status(400).json({ error: "Evolution no configurado" });
+      return;
+    }
+    const mime = file.mimetype || "application/octet-stream";
+    const mediatype = pickMediatype(mime);
+    const base64 = file.buffer.toString("base64");
+    const fileName = file.originalname?.slice(0, 200) || undefined;
+    const sent = await sendMedia(cfg, contact.phone, {
+      mediatype,
+      media: base64,
+      caption: caption || undefined,
+      fileName,
+      mimetype: mime,
+    });
+    if (!sent.ok) {
+      res.status(502).json({ error: sent.error });
+      return;
+    }
+    const preview =
+      caption ||
+      fileName ||
+      (mediatype === "image"
+        ? "[Imagen enviada]"
+        : mediatype === "video"
+          ? "[Video enviado]"
+          : mediatype === "audio"
+            ? "[Audio enviado]"
+            : "[Documento enviado]");
+    await db.insert(whatsappMessages).values({
+      conversationId: id,
+      direction: "out",
+      sender: "human",
+      messageType: mediatype,
+      content: caption || fileName || null,
+      mediaBase64: base64,
+      mediaMimeType: mime,
+    });
+    await db
+      .update(whatsappConversations)
+      .set({
+        lastMessageAt: new Date(),
+        lastMessagePreview: preview.slice(0, 240),
+        updatedAt: new Date(),
+      })
+      .where(eq(whatsappConversations.id, id));
+    res.json({ ok: true });
+  },
+);
 
 // ───────────── Tickets ─────────────
 

@@ -17,6 +17,7 @@ import {
   CheckCircle2,
   Power,
   Loader2,
+  Paperclip,
   Ticket as TicketIcon,
 } from "lucide-react";
 import {
@@ -50,7 +51,9 @@ export default function WhatsappInboxPage() {
   const [detail, setDetail] = useState<WaConversationDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [draft, setDraft] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [ticketOpen, setTicketOpen] = useState(false);
   const [ticketSaving, setTicketSaving] = useState(false);
   const [ticketDraft, setTicketDraft] = useState({
@@ -123,6 +126,25 @@ export default function WhatsappInboxPage() {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [detail?.messages.length]);
+
+  const handleAttach = async (file: File) => {
+    if (!selectedId) return;
+    setUploading(true);
+    try {
+      await waApi.sendMedia(selectedId, file, draft);
+      setDraft("");
+      await loadDetail(selectedId);
+    } catch (e) {
+      toast({
+        title: "Error al subir archivo",
+        description: e instanceof Error ? e.message : "Falló la carga",
+        variant: "destructive",
+      });
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
 
   const handleSend = async () => {
     if (!selectedId || !draft.trim()) return;
@@ -327,6 +349,30 @@ export default function WhatsappInboxPage() {
                   </div>
                 )}
                 <div className="flex gap-2">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    className="hidden"
+                    accept="image/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain,video/*,audio/*"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) handleAttach(f);
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    title="Adjuntar archivo"
+                    disabled={uploading || sending}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    {uploading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Paperclip className="w-4 h-4" />
+                    )}
+                  </Button>
                   <Input
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}
@@ -336,10 +382,14 @@ export default function WhatsappInboxPage() {
                         handleSend();
                       }
                     }}
-                    placeholder="Escribe una respuesta..."
-                    disabled={sending}
+                    placeholder={
+                      uploading
+                        ? "Enviando archivo..."
+                        : "Escribe una respuesta o adjunta un archivo..."
+                    }
+                    disabled={sending || uploading}
                   />
-                  <Button onClick={handleSend} disabled={sending || !draft.trim()}>
+                  <Button onClick={handleSend} disabled={sending || uploading || !draft.trim()}>
                     {sending ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
                     ) : (
@@ -518,7 +568,19 @@ function MessageBubble({
         )}
         {m.messageType === "document" && (
           <div className="flex items-center gap-2 text-xs">
-            <FileText className="w-3.5 h-3.5" /> {m.content || "Documento"}
+            <FileText className="w-3.5 h-3.5" />
+            {m.hasMedia ? (
+              <a
+                href={`${import.meta.env.BASE_URL.replace(/\/$/, "")}/api/whatsapp/messages/${m.id}/media`}
+                target="_blank"
+                rel="noreferrer"
+                className="underline hover:text-primary"
+              >
+                {m.content || "Documento"}
+              </a>
+            ) : (
+              <span>{m.content || "Documento"}</span>
+            )}
           </div>
         )}
         {m.messageType === "text" && m.content}
