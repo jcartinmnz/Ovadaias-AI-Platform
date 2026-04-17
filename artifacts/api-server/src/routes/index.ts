@@ -5,6 +5,7 @@ import marketingRouter from "./marketing";
 import calendarRouter from "./calendar";
 import chatProjectsRouter from "./chat-projects";
 import whatsappRouter from "./whatsapp";
+import insightsRouter from "./insights";
 import { requireAuth } from "../middlewares/requireAuth";
 
 const router: IRouter = Router();
@@ -14,7 +15,7 @@ const router: IRouter = Router();
 // reachable without a session. The WhatsApp router additionally enforces auth
 // internally for everything except its public webhook.
 router.use(
-  ["/openai", "/marketing", "/calendar", "/chat-projects", "/conversations"],
+  ["/openai", "/marketing", "/calendar", "/chat-projects", "/conversations", "/insights"],
   requireAuth,
 );
 
@@ -24,5 +25,6 @@ router.use(marketingRouter);
 router.use(calendarRouter);
 router.use(chatProjectsRouter);
 router.use(whatsappRouter);
+router.use("/insights", insightsRouter);
 
 export default router;

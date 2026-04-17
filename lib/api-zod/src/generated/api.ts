@@ -103,3 +103,36 @@ export const GenerateOpenaiImageBody = zod.object({
 export const GenerateOpenaiImageResponse = zod.object({
   b64_json: zod.string(),
 });
+
+// ─── Insights ───────────────────────────────────────────────────────────────
+
+export const InsightsPeriodParam = zod.enum(["day", "week", "month"]);
+
+export const InsightsMetricsResponse = zod.object({
+  period: InsightsPeriodParam,
+  from: zod.string(),
+  to: zod.string(),
+  total: zod.number(),
+  leads: zod.number(),
+  conversationsByDay: zod.array(
+    zod.object({ day: zod.string(), count: zod.number() }),
+  ),
+  resolution: zod.object({ auto: zod.number(), escalated: zod.number() }),
+  tickets: zod.object({
+    open: zod.number(),
+    in_progress: zod.number(),
+    resolved: zod.number(),
+    closed: zod.number(),
+  }),
+  avgResponseTime: zod.number(),
+  topics: zod.array(zod.object({ topic: zod.string(), count: zod.number() })),
+});
+
+export const InsightsChatBody = zod.object({
+  messages: zod.array(
+    zod.object({
+      role: zod.enum(["user", "assistant"]),
+      content: zod.string(),
+    }),
+  ),
+});
