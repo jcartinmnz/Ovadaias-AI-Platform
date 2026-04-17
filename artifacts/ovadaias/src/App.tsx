@@ -29,6 +29,7 @@ import CalendarPage from "@/pages/calendar";
 import WhatsappInboxPage from "@/pages/whatsapp-inbox";
 import WhatsappTicketsPage from "@/pages/whatsapp-tickets";
 import WhatsappSettingsPage from "@/pages/whatsapp-settings";
+import InsightsPage from "@/pages/insights";
 import SignUpDisabledPage from "@/pages/sign-up-disabled";
 
 const queryClient = new QueryClient({
@@ -249,6 +250,7 @@ function ProtectedRoutes() {
       <Route path="/whatsapp" component={WhatsappInboxPage} />
       <Route path="/whatsapp/tickets" component={WhatsappTicketsPage} />
       <Route path="/whatsapp/settings" component={WhatsappSettingsPage} />
+      <Route path="/insights" component={InsightsPage} />
       <Route component={NotFound} />
     </Switch>
   );

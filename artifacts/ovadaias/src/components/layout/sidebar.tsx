@@ -25,6 +25,7 @@ import {
   Pencil,
   FolderInput,
   LogOut,
+  BarChart2,
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useQueryClient } from "@tanstack/react-query";
@@ -344,6 +345,17 @@ export function Sidebar({
           >
             <Calendar className="w-4 h-4" />
             {!sidebarCollapsed && "Calendar"}
+          </Button>
+        </Link>
+        <Link href="/insights">
+          <Button
+            className={navButtonClass}
+            variant="ghost"
+            size={sidebarCollapsed ? "icon" : "default"}
+            title={sidebarCollapsed ? "Insights" : undefined}
+          >
+            <BarChart2 className="w-4 h-4" />
+            {!sidebarCollapsed && "Insights"}
           </Button>
         </Link>
         {!sidebarCollapsed && <WhatsappNavLinks />}
