@@ -1,10 +1,10 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ClerkProvider,
   SignIn,
-  SignUp,
   Show,
   useClerk,
+  useUser,
 } from "@clerk/react";
 import {
   Switch,
@@ -29,6 +29,7 @@ import CalendarPage from "@/pages/calendar";
 import WhatsappInboxPage from "@/pages/whatsapp-inbox";
 import WhatsappTicketsPage from "@/pages/whatsapp-tickets";
 import WhatsappSettingsPage from "@/pages/whatsapp-settings";
+import SignUpDisabledPage from "@/pages/sign-up-disabled";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -108,6 +109,8 @@ const clerkAppearance = {
 function SignInPage() {
   // To update login providers, app branding, or OAuth settings use the Auth
   // pane in the workspace toolbar. More information can be found in the Replit docs.
+  // Public sign-up is intentionally disabled — see SignUpDisabledPage and
+  // AuthorizedOnly below. Operators must be added/invited via the Auth pane.
   return (
     <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4">
       <SignIn
@@ -119,18 +122,97 @@ function SignInPage() {
   );
 }
 
-function SignUpPage() {
-  // To update login providers, app branding, or OAuth settings use the Auth
-  // pane in the workspace toolbar. More information can be found in the Replit docs.
+const allowedEmailsRaw = import.meta.env.VITE_ALLOWED_EMAILS as
+  | string
+  | undefined;
+const allowedDomainsRaw = import.meta.env.VITE_ALLOWED_EMAIL_DOMAINS as
+  | string
+  | undefined;
+
+function parseList(value: string | undefined): string[] {
+  if (!value) return [];
+  return value
+    .split(/[,\s]+/)
+    .map((entry) => entry.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+const allowedEmails = parseList(allowedEmailsRaw);
+const allowedDomains = parseList(allowedDomainsRaw).map((domain) =>
+  domain.replace(/^@/, ""),
+);
+const allowlistConfigured =
+  allowedEmails.length > 0 || allowedDomains.length > 0;
+
+function isEmailAuthorized(email: string | undefined | null): boolean {
+  if (!allowlistConfigured) return true;
+  if (!email) return false;
+  const normalized = email.trim().toLowerCase();
+  if (allowedEmails.includes(normalized)) return true;
+  const domain = normalized.split("@")[1] ?? "";
+  return allowedDomains.includes(domain);
+}
+
+function UnauthorizedAccount({ email }: { email: string | null }) {
+  const { signOut } = useClerk();
+  const [signingOut, setSigningOut] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setSigningOut(true);
+    signOut({ redirectUrl: `${basePath}/sign-in` })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setSigningOut(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [signOut]);
+
   return (
     <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4">
-      <SignUp
-        routing="path"
-        path={`${basePath}/sign-up`}
-        signInUrl={`${basePath}/sign-in`}
-      />
+      <div
+        className="w-full max-w-md rounded-2xl border border-destructive/40 bg-card p-8 text-center shadow-2xl"
+        data-testid="unauthorized-account"
+      >
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+          Cuenta no autorizada
+        </h1>
+        <p className="mt-3 text-sm text-muted-foreground">
+          {email ? (
+            <>
+              El correo <span className="font-medium text-foreground">{email}</span>{" "}
+              no está autorizado para acceder al panel de Ovadaias.
+            </>
+          ) : (
+            <>Tu cuenta no está autorizada para acceder al panel de Ovadaias.</>
+          )}
+        </p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Solicita acceso a un administrador del workspace.{" "}
+          {signingOut ? "Cerrando sesión…" : "Sesión cerrada."}
+        </p>
+      </div>
     </div>
   );
+}
+
+function AuthorizedOnly({ children }: { children: React.ReactNode }) {
+  const { isLoaded, user } = useUser();
+
+  const primaryEmail = useMemo(() => {
+    if (!user) return null;
+    const primary = user.primaryEmailAddress?.emailAddress;
+    if (primary) return primary;
+    return user.emailAddresses?.[0]?.emailAddress ?? null;
+  }, [user]);
+
+  if (!isLoaded) return null;
+  if (!isEmailAuthorized(primaryEmail)) {
+    return <UnauthorizedAccount email={primaryEmail} />;
+  }
+  return <>{children}</>;
 }
 
 function ClerkQueryClientCacheInvalidator() {
@@ -176,10 +258,12 @@ function AppRoutes() {
   return (
     <Switch>
       <Route path="/sign-in/*?" component={SignInPage} />
-      <Route path="/sign-up/*?" component={SignUpPage} />
+      <Route path="/sign-up/*?" component={SignUpDisabledPage} />
       <Route>
         <Show when="signed-in">
-          <ProtectedRoutes />
+          <AuthorizedOnly>
+            <ProtectedRoutes />
+          </AuthorizedOnly>
         </Show>
         <Show when="signed-out">
           <Redirect to="/sign-in" />

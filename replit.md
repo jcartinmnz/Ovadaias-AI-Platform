@@ -35,6 +35,11 @@ Spanish/English corporate AI agent with futuristic purple branding.
 - **Branding**: nuclear purple #6327EC, Orbitron + Exo 2 fonts, brand gradient on logo/headings, carbon-black background
 - **Chat**: Streaming chat UI calling `/api/openai/conversations/:id/messages` (SSE)
 - **Knowledge base** (`/knowledge`): Upload company documents (paste, `.txt`/`.md`, `.pdf`, or `.docx`). Each document is split into ~1000-char overlapping chunks and indexed for retrieval. PDF parsing uses `pdf-parse` v2 (`PDFParse` class), DOCX uses `mammoth.extractRawText`.
+- **Acceso restringido (invitación)**: el registro público está deshabilitado. La ruta `/sign-up` muestra una página informativa (`pages/sign-up-disabled.tsx`); solo `/sign-in` permite entrar. Para invitar un nuevo operador:
+  1. Abre el panel **Auth** desde la barra del workspace.
+  2. En la pestaña **Users** crea/invita la cuenta del operador con su correo corporativo.
+  3. (Opcional pero recomendado) Define una allowlist por entorno con `VITE_ALLOWED_EMAILS` (lista separada por comas) y/o `VITE_ALLOWED_EMAIL_DOMAINS` (ej. `ovadaias.com,partner.com`). Si se configura, cualquier sesión cuya dirección no coincida será cerrada automáticamente y verá el mensaje "Cuenta no autorizada" (`AuthorizedOnly` en `App.tsx`).
+  4. Para revocar acceso, banea/elimina al usuario en la pestaña **Users** del panel Auth.
 
 ### API server (`artifacts/api-server`)
 
