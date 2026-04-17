@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Shell } from "@/components/layout/shell";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -37,19 +37,27 @@ const PRIORITY_COLOR: Record<string, string> = {
   low: "bg-muted text-muted-foreground border-border/40",
 };
 
+const COLUMNS: { key: string; label: string; accent: string }[] = [
+  { key: "open", label: "Abierto", accent: "border-amber-500/40" },
+  { key: "in_progress", label: "En progreso", accent: "border-blue-500/40" },
+  { key: "resolved", label: "Resuelto", accent: "border-emerald-500/40" },
+  { key: "closed", label: "Cerrado", accent: "border-border/40" },
+];
+
 export default function WhatsappTicketsPage() {
   const { toast } = useToast();
   const [tickets, setTickets] = useState<WaTicket[]>([]);
-  const [filter, setFilter] = useState<string>("all");
+  const [priorityFilter, setPriorityFilter] = useState<string>("all");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [notesEditing, setNotesEditing] = useState<WaTicket | null>(null);
   const [notesDraft, setNotesDraft] = useState("");
   const [savingNotes, setSavingNotes] = useState(false);
+  const [draggingId, setDraggingId] = useState<number | null>(null);
+  const [dragOver, setDragOver] = useState<string | null>(null);
 
   const load = async () => {
     try {
-      const list = await waApi.listTickets(
-        filter === "all" ? undefined : filter,
-      );
+      const list = await waApi.listTickets();
       setTickets(list);
     } catch (e) {
       toast({
@@ -65,16 +73,8 @@ export default function WhatsappTicketsPage() {
     const t = setInterval(load, 10000);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter]);
+  }, []);
 
-  const updateStatus = async (id: number, status: string) => {
-    try {
-      await waApi.updateTicket(id, { status });
-      await load();
-    } catch (e) {
-      toast({ title: "Error", description: String(e), variant: "destructive" });
-    }
-  };
   const updatePriority = async (id: number, priority: string) => {
     try {
       await waApi.updateTicket(id, { priority });
@@ -84,157 +84,275 @@ export default function WhatsappTicketsPage() {
     }
   };
 
+  const moveTicket = async (id: number, status: string) => {
+    const current = tickets.find((t) => t.id === id);
+    if (!current || current.status === status) return;
+    setTickets((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, status } : t)),
+    );
+    try {
+      await waApi.updateTicket(id, { status });
+    } catch (e) {
+      toast({ title: "Error", description: String(e), variant: "destructive" });
+      await load();
+    }
+  };
+
+  const categories = useMemo(() => {
+    const set = new Set<string>();
+    for (const t of tickets) if (t.category) set.add(t.category);
+    return Array.from(set).sort();
+  }, [tickets]);
+
+  const filtered = useMemo(
+    () =>
+      tickets.filter((t) => {
+        if (priorityFilter !== "all" && t.priority !== priorityFilter)
+          return false;
+        if (categoryFilter !== "all" && (t.category ?? "") !== categoryFilter)
+          return false;
+        return true;
+      }),
+    [tickets, priorityFilter, categoryFilter],
+  );
+
+  const byStatus = useMemo(() => {
+    const map: Record<string, WaTicket[]> = {
+      open: [],
+      in_progress: [],
+      resolved: [],
+      closed: [],
+    };
+    for (const t of filtered) {
+      (map[t.status] ?? (map[t.status] = [])).push(t);
+    }
+    return map;
+  }, [filtered]);
+
   return (
     <Shell>
       <div className="flex flex-col h-full">
-        <div className="border-b border-border/40 p-4 flex items-center gap-3">
+        <div className="border-b border-border/40 p-4 flex items-center gap-3 flex-wrap">
           <TicketIcon className="w-5 h-5 text-primary" />
           <h1 className="font-mono uppercase tracking-wider text-primary">
             Tickets WhatsApp
           </h1>
-          <div className="ml-auto">
-            <Select value={filter} onValueChange={setFilter}>
-              <SelectTrigger className="w-44">
-                <SelectValue />
+          <div className="ml-auto flex items-center gap-2 flex-wrap">
+            <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+              <SelectTrigger className="w-40" data-testid="filter-priority">
+                <SelectValue placeholder="Prioridad" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="open">Abiertos</SelectItem>
-                <SelectItem value="in_progress">En progreso</SelectItem>
-                <SelectItem value="resolved">Resueltos</SelectItem>
-                <SelectItem value="closed">Cerrados</SelectItem>
+                <SelectItem value="all">Todas las prioridades</SelectItem>
+                <SelectItem value="urgent">Urgente</SelectItem>
+                <SelectItem value="high">Alta</SelectItem>
+                <SelectItem value="normal">Normal</SelectItem>
+                <SelectItem value="low">Baja</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="w-44" data-testid="filter-category">
+                <SelectValue placeholder="Categoría" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas las categorías</SelectItem>
+                {categories.map((c) => (
+                  <SelectItem key={c} value={c}>
+                    {c}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
         </div>
+
         <ScrollArea className="flex-1">
-          <div className="p-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-            {tickets.length === 0 && (
-              <div className="col-span-full text-muted-foreground italic text-sm">
-                No hay tickets en este filtro.
-              </div>
-            )}
-            {tickets.map((t) => (
-              <div
-                key={t.id}
-                className="border border-border/40 rounded-lg p-4 bg-card/30 space-y-2"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <div className="font-semibold">{t.title}</div>
-                    <div className="text-[11px] text-muted-foreground font-mono">
-                      #{t.id} · {new Date(t.createdAt).toLocaleString("es")}
+          <div className="p-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 min-h-full">
+            {COLUMNS.map((col) => {
+              const items = byStatus[col.key] ?? [];
+              const isOver = dragOver === col.key;
+              return (
+                <div
+                  key={col.key}
+                  data-testid={`kanban-column-${col.key}`}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setDragOver(col.key);
+                  }}
+                  onDragLeave={() => {
+                    setDragOver((prev) => (prev === col.key ? null : prev));
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setDragOver(null);
+                    const id = Number(e.dataTransfer.getData("text/plain"));
+                    if (Number.isFinite(id)) moveTicket(id, col.key);
+                    setDraggingId(null);
+                  }}
+                  className={`flex flex-col rounded-lg border ${col.accent} bg-card/20 transition-colors ${
+                    isOver ? "bg-primary/10 ring-1 ring-primary/40" : ""
+                  }`}
+                >
+                  <div className="px-3 py-2 border-b border-border/40 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Badge
+                        className={`border ${STATUS_COLOR[col.key] || ""}`}
+                      >
+                        {col.label}
+                      </Badge>
                     </div>
-                  </div>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    title="Notas internas"
-                    onClick={() => {
-                      setNotesEditing(t);
-                      setNotesDraft(t.internalNotes ?? "");
-                    }}
-                  >
-                    <StickyNote className="w-4 h-4" />
-                  </Button>
-                  <Link href={`/whatsapp?conversation=${t.conversationId}`}>
-                    <Button size="icon" variant="ghost" title="Abrir conversación">
-                      <ExternalLink className="w-4 h-4" />
-                    </Button>
-                  </Link>
-                </div>
-                <div className="flex items-center flex-wrap gap-2">
-                  <Badge className={`border ${STATUS_COLOR[t.status] || ""}`}>
-                    {t.status}
-                  </Badge>
-                  <Badge className={`border ${PRIORITY_COLOR[t.priority] || ""}`}>
-                    {t.priority}
-                  </Badge>
-                  {t.category && (
-                    <Badge variant="outline" className="text-[10px]">
-                      {t.category}
-                    </Badge>
-                  )}
-                  <Badge variant="outline" className="text-[10px]">
-                    {t.createdBy === "agent" ? "🤖 IA" : "👤 humano"}
-                  </Badge>
-                </div>
-                {t.contact && (
-                  <div className="text-xs text-muted-foreground">
-                    Cliente: <strong>{t.contact.name || t.contact.phone}</strong>{" "}
-                    +{t.contact.phone}
-                  </div>
-                )}
-                <div className="flex items-center gap-2 text-xs">
-                  <span className="text-muted-foreground shrink-0">
-                    Encargado:
-                  </span>
-                  <Input
-                    className="h-7 text-xs"
-                    defaultValue={t.assignedTo ?? ""}
-                    placeholder="Nombre o email del responsable"
-                    onBlur={async (e) => {
-                      const v = e.target.value.trim();
-                      if (v === (t.assignedTo ?? "")) return;
-                      try {
-                        await waApi.updateTicket(t.id, { assignedTo: v });
-                        toast({ title: "Asignado actualizado" });
-                        await load();
-                      } catch (err) {
-                        toast({
-                          title: "Error",
-                          description: String(err),
-                          variant: "destructive",
-                        });
-                      }
-                    }}
-                  />
-                </div>
-                {t.summary && (
-                  <p className="text-sm text-foreground/80 whitespace-pre-wrap">
-                    {t.summary}
-                  </p>
-                )}
-                {t.internalNotes && (
-                  <div className="text-xs bg-amber-500/10 border border-amber-500/30 rounded p-2 text-amber-100/90 whitespace-pre-wrap">
-                    <span className="font-mono uppercase text-[10px] text-amber-300">
-                      Notas internas
+                    <span
+                      className="text-xs text-muted-foreground font-mono"
+                      data-testid={`kanban-count-${col.key}`}
+                    >
+                      {items.length}
                     </span>
-                    <div className="mt-1">{t.internalNotes}</div>
                   </div>
-                )}
-                <div className="flex items-center gap-2 pt-2 border-t border-border/30">
-                  <Select
-                    value={t.status}
-                    onValueChange={(v) => updateStatus(t.id, v)}
-                  >
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="open">Abierto</SelectItem>
-                      <SelectItem value="in_progress">En progreso</SelectItem>
-                      <SelectItem value="resolved">Resuelto</SelectItem>
-                      <SelectItem value="closed">Cerrado</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select
-                    value={t.priority}
-                    onValueChange={(v) => updatePriority(t.id, v)}
-                  >
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low">Baja</SelectItem>
-                      <SelectItem value="normal">Normal</SelectItem>
-                      <SelectItem value="high">Alta</SelectItem>
-                      <SelectItem value="urgent">Urgente</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <div className="p-2 space-y-2 min-h-[120px]">
+                    {items.length === 0 && (
+                      <div className="text-[11px] text-muted-foreground italic px-2 py-4 text-center">
+                        Sin tickets
+                      </div>
+                    )}
+                    {items.map((t) => (
+                      <div
+                        key={t.id}
+                        draggable
+                        onDragStart={(e) => {
+                          e.dataTransfer.setData("text/plain", String(t.id));
+                          e.dataTransfer.effectAllowed = "move";
+                          setDraggingId(t.id);
+                        }}
+                        onDragEnd={() => {
+                          setDraggingId(null);
+                          setDragOver(null);
+                        }}
+                        data-testid={`ticket-card-${t.id}`}
+                        className={`border border-border/40 rounded-md p-3 bg-card/60 space-y-2 cursor-grab active:cursor-grabbing ${
+                          draggingId === t.id ? "opacity-50" : ""
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <div
+                              className="font-semibold text-sm truncate"
+                              title={t.title}
+                            >
+                              {t.title}
+                            </div>
+                            <div className="text-[10px] text-muted-foreground font-mono">
+                              #{t.id} ·{" "}
+                              {new Date(t.createdAt).toLocaleString("es")}
+                            </div>
+                          </div>
+                          <div className="flex items-center shrink-0">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              title="Notas internas"
+                              onClick={() => {
+                                setNotesEditing(t);
+                                setNotesDraft(t.internalNotes ?? "");
+                              }}
+                            >
+                              <StickyNote className="w-4 h-4" />
+                            </Button>
+                            <Link
+                              href={`/whatsapp?conversation=${t.conversationId}`}
+                            >
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                title="Abrir conversación"
+                              >
+                                <ExternalLink className="w-4 h-4" />
+                              </Button>
+                            </Link>
+                          </div>
+                        </div>
+                        <div className="flex items-center flex-wrap gap-1.5">
+                          <Badge
+                            className={`border text-[10px] ${
+                              PRIORITY_COLOR[t.priority] || ""
+                            }`}
+                          >
+                            {t.priority}
+                          </Badge>
+                          {t.category && (
+                            <Badge
+                              variant="outline"
+                              className="text-[10px]"
+                            >
+                              {t.category}
+                            </Badge>
+                          )}
+                          <Badge variant="outline" className="text-[10px]">
+                            {t.createdBy === "agent" ? "🤖 IA" : "👤"}
+                          </Badge>
+                        </div>
+                        {t.contact && (
+                          <div className="text-[11px] text-muted-foreground truncate">
+                            {t.contact.name || t.contact.phone} · +
+                            {t.contact.phone}
+                          </div>
+                        )}
+                        {t.summary && (
+                          <p className="text-xs text-foreground/80 whitespace-pre-wrap line-clamp-3">
+                            {t.summary}
+                          </p>
+                        )}
+                        {t.internalNotes && (
+                          <div className="text-[11px] bg-amber-500/10 border border-amber-500/30 rounded p-1.5 text-amber-100/90 whitespace-pre-wrap line-clamp-3">
+                            {t.internalNotes}
+                          </div>
+                        )}
+                        <div className="flex items-center gap-1.5 text-[11px]">
+                          <span className="text-muted-foreground shrink-0">
+                            Encargado:
+                          </span>
+                          <Input
+                            className="h-6 text-[11px] px-2"
+                            defaultValue={t.assignedTo ?? ""}
+                            placeholder="Responsable"
+                            onBlur={async (e) => {
+                              const v = e.target.value.trim();
+                              if (v === (t.assignedTo ?? "")) return;
+                              try {
+                                await waApi.updateTicket(t.id, {
+                                  assignedTo: v,
+                                });
+                                toast({ title: "Asignado actualizado" });
+                                await load();
+                              } catch (err) {
+                                toast({
+                                  title: "Error",
+                                  description: String(err),
+                                  variant: "destructive",
+                                });
+                              }
+                            }}
+                          />
+                        </div>
+                        <Select
+                          value={t.priority}
+                          onValueChange={(v) => updatePriority(t.id, v)}
+                        >
+                          <SelectTrigger className="h-7 text-[11px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="low">Baja</SelectItem>
+                            <SelectItem value="normal">Normal</SelectItem>
+                            <SelectItem value="high">Alta</SelectItem>
+                            <SelectItem value="urgent">Urgente</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </ScrollArea>
       </div>
@@ -258,10 +376,7 @@ export default function WhatsappTicketsPage() {
             placeholder="Notas privadas del equipo (no se envían al cliente)"
           />
           <DialogFooter>
-            <Button
-              variant="ghost"
-              onClick={() => setNotesEditing(null)}
-            >
+            <Button variant="ghost" onClick={() => setNotesEditing(null)}>
               Cancelar
             </Button>
             <Button
