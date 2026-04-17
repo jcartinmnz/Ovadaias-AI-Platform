@@ -211,8 +211,33 @@ export function Sidebar() {
     }
   };
 
+  const handleDeleteConversation = async (convId: number) => {
+    try {
+      const res = await fetch(
+        `${import.meta.env.BASE_URL.replace(/\/$/, "")}/api/openai/conversations/${convId}`,
+        { method: "DELETE" },
+      );
+      if (!res.ok) throw new Error("No se pudo eliminar el chat");
+      await refreshConversations();
+      toast({
+        title: "Chat eliminado",
+        description: "La conversación fue borrada correctamente.",
+      });
+    } catch (e) {
+      toast({
+        title: "Error",
+        description: e instanceof Error ? e.message : "No se pudo eliminar",
+        variant: "destructive",
+      });
+    }
+  };
+
   const toggleCollapsed = (key: number | "none") =>
     setCollapsed((s) => ({ ...s, [key]: !s[key] }));
+
+  const navButtonClass = sidebarCollapsed
+    ? "w-10 justify-center gap-0 border border-border/40 hover:bg-sidebar-accent px-0"
+    : "w-full justify-start gap-2 border border-border/40 hover:bg-sidebar-accent";
 
   const { signOut } = useClerk();
   const { user } = useUser();
@@ -262,8 +287,12 @@ export function Sidebar() {
       <div className="p-3 space-y-2">
         <Button
           onClick={() => handleNewChat(null)}
-          className="w-full justify-start gap-2 bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary-foreground border border-primary/20"
+          className={
+            "bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary-foreground border border-primary/20 " +
+            (sidebarCollapsed ? "w-10 px-0" : "w-full justify-start gap-2")
+          }
           variant="outline"
+          size={sidebarCollapsed ? "icon" : "default"}
           title={sidebarCollapsed ? "Nuevo chat" : undefined}
         >
           <Plus className="w-4 h-4" />
@@ -271,8 +300,9 @@ export function Sidebar() {
         </Button>
         <Link href="/knowledge">
           <Button
-            className="w-full justify-start gap-2 border border-border/40 hover:bg-sidebar-accent"
+            className={navButtonClass}
             variant="ghost"
+            size={sidebarCollapsed ? "icon" : "default"}
             title={sidebarCollapsed ? "Knowledge Base" : undefined}
           >
             <Database className="w-4 h-4" />
@@ -281,8 +311,9 @@ export function Sidebar() {
         </Link>
         <Link href="/marketing">
           <Button
-            className="w-full justify-start gap-2 border border-border/40 hover:bg-sidebar-accent"
+            className={navButtonClass}
             variant="ghost"
+            size={sidebarCollapsed ? "icon" : "default"}
             title={sidebarCollapsed ? "Marketing Studio" : undefined}
           >
             <Sparkles className="w-4 h-4" />
@@ -291,8 +322,9 @@ export function Sidebar() {
         </Link>
         <Link href="/calendar">
           <Button
-            className="w-full justify-start gap-2 border border-border/40 hover:bg-sidebar-accent"
+            className={navButtonClass}
             variant="ghost"
+            size={sidebarCollapsed ? "icon" : "default"}
             title={sidebarCollapsed ? "Calendar" : undefined}
           >
             <Calendar className="w-4 h-4" />
@@ -343,6 +375,7 @@ export function Sidebar() {
                     setDialogOpen(true);
                   }}
                   onMoveConversation={handleMoveConversation}
+                  onDeleteConversation={handleDeleteConversation}
                   projects={projects}
                 />
               );
@@ -353,6 +386,7 @@ export function Sidebar() {
             collapsed={!!collapsed["none"]}
             onToggle={() => toggleCollapsed("none")}
             onMoveConversation={handleMoveConversation}
+            onDeleteConversation={handleDeleteConversation}
             projects={projects}
           />
         </div>
@@ -360,17 +394,22 @@ export function Sidebar() {
 
       <div className="p-3 border-t border-sidebar-border space-y-2">
         {user && (
-          <div className="text-[11px] font-mono text-muted-foreground truncate px-1">
+          <div className={"text-[11px] font-mono text-muted-foreground truncate px-1 " + (sidebarCollapsed ? "hidden" : "")}>
             {user.primaryEmailAddress?.emailAddress ?? user.username ?? "Sesión activa"}
           </div>
         )}
         <Button
           onClick={() => signOut()}
           variant="ghost"
-          className="w-full justify-start gap-2 border border-border/40 hover:bg-sidebar-accent"
+          className={
+            "border border-border/40 hover:bg-sidebar-accent " +
+            (sidebarCollapsed ? "w-10 px-0 justify-center" : "w-full justify-start gap-2")
+          }
+          size={sidebarCollapsed ? "icon" : "default"}
+          title="Cerrar sesión"
         >
           <LogOut className="w-4 h-4" />
-          Cerrar sesión
+          {!sidebarCollapsed && "Cerrar sesión"}
         </Button>
       </div>
 
@@ -393,6 +432,7 @@ function ProjectGroup({
   onAddChat,
   onEdit,
   onMoveConversation,
+  onDeleteConversation,
   projects,
 }: {
   project: ChatProject;
@@ -402,6 +442,7 @@ function ProjectGroup({
   onAddChat: () => void;
   onEdit: () => void;
   onMoveConversation: (convId: number, projectId: number | null) => void;
+  onDeleteConversation: (convId: number) => void;
   projects: ChatProject[];
 }) {
   const dot = project.color || "#a855f7";
@@ -467,6 +508,7 @@ function ProjectGroup({
                 conv={c}
                 projects={projects}
                 onMove={onMoveConversation}
+                onDelete={onDeleteConversation}
               />
             ))
           )}
@@ -481,12 +523,14 @@ function UnassignedGroup({
   collapsed,
   onToggle,
   onMoveConversation,
+  onDeleteConversation,
   projects,
 }: {
   conversations: Conv[];
   collapsed: boolean;
   onToggle: () => void;
   onMoveConversation: (convId: number, projectId: number | null) => void;
+  onDeleteConversation: (convId: number) => void;
   projects: ChatProject[];
 }) {
   if (conversations.length === 0) return null;
@@ -517,6 +561,7 @@ function UnassignedGroup({
               conv={c}
               projects={projects}
               onMove={onMoveConversation}
+              onDelete={onDeleteConversation}
             />
           ))}
         </div>
@@ -529,10 +574,12 @@ function ConversationRow({
   conv,
   projects,
   onMove,
+  onDelete,
 }: {
   conv: Conv;
   projects: ChatProject[];
   onMove: (convId: number, projectId: number | null) => void;
+  onDelete: (convId: number) => void;
 }) {
   const [location] = useLocation();
   const isActive = location === `/chat/${conv.id}`;
@@ -595,6 +642,13 @@ function ConversationRow({
               Crea un proyecto primero.
             </div>
           )}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onClick={() => onDelete(conv.id)}
+            className="text-xs text-destructive focus:text-destructive"
+          >
+            Eliminar chat
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
