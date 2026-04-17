@@ -204,7 +204,12 @@ export default function WhatsappInboxPage() {
     <Shell>
       <div className="flex h-full">
         {/* Conversation list */}
-        <div className="w-80 border-r border-border/40 flex flex-col bg-card/20">
+        <div
+          className={
+            "md:w-80 md:flex border-r border-border/40 flex-col bg-card/20 " +
+            (selectedId ? "hidden md:flex" : "flex w-full")
+          }
+        >
           <div className="p-4 border-b border-border/40">
             <h2 className="text-sm font-mono uppercase tracking-wider text-primary">
               <MessageCircle className="inline w-4 h-4 mr-2" /> WhatsApp Inbox
@@ -263,14 +268,32 @@ export default function WhatsappInboxPage() {
         </div>
 
         {/* Thread */}
-        <div className="flex-1 flex flex-col min-w-0">
+        <div
+          className={
+            "flex-1 flex-col min-w-0 " +
+            (selectedId ? "flex" : "hidden md:flex")
+          }
+        >
           {!detail ? (
             <div className="flex-1 flex items-center justify-center text-muted-foreground">
               Selecciona una conversación
             </div>
           ) : (
             <>
-              <div className="border-b border-border/40 p-4 flex items-center gap-4 bg-card/10">
+              <div className="border-b border-border/40 p-4 flex items-center gap-3 bg-card/10">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="md:hidden h-8 w-8 shrink-0 border border-border/30"
+                  onClick={() => {
+                    setSelectedId(null);
+                    setDetail(null);
+                  }}
+                  aria-label="Volver a la lista"
+                  title="Volver"
+                >
+                  <span className="text-lg leading-none">←</span>
+                </Button>
                 <div className="flex-1 min-w-0">
                   <div className="font-semibold flex items-center gap-2">
                     <Phone className="w-4 h-4 text-primary" />

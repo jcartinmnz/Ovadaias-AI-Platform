@@ -113,14 +113,18 @@ type Conv = {
   projectId?: number | null;
 };
 
-export function Sidebar() {
+export function Sidebar({
+  mobile = false,
+  onNavigate,
+}: { mobile?: boolean; onNavigate?: () => void } = {}) {
   const { data: conversations, isLoading } = useListOpenaiConversations();
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   const [projects, setProjects] = useState<ChatProject[]>([]);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
+  const [sidebarCollapsedState, setSidebarCollapsed] = useState<boolean>(false);
+  const sidebarCollapsed = mobile ? false : sidebarCollapsedState;
   const [collapsed, setCollapsed] = useState<
     Partial<Record<number | "none", boolean>>
   >({});
@@ -164,6 +168,7 @@ export function Sidebar() {
       const conv = await createConversationInProject(projectId, "New Conversation");
       await refreshConversations();
       setLocation(`/chat/${conv.id}`);
+      onNavigate?.();
     } catch (e) {
       toast({
         title: "Error",
@@ -244,9 +249,17 @@ export function Sidebar() {
 
   return (
     <div
+      onClick={
+        mobile
+          ? (e) => {
+              const target = e.target as HTMLElement;
+              if (target.closest("a")) onNavigate?.();
+            }
+          : undefined
+      }
       className={
         "h-full bg-sidebar border-r border-sidebar-border flex flex-col transition-[width] duration-200 ease-linear overflow-hidden " +
-        (sidebarCollapsed ? "w-16" : "w-64")
+        (mobile ? "w-full" : sidebarCollapsed ? "w-16" : "w-64")
       }
     >
       <div className="p-4 border-b border-sidebar-border flex items-center justify-between gap-2">
@@ -267,21 +280,23 @@ export function Sidebar() {
             </span>
           )}
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 shrink-0 border border-border/30 hover:bg-sidebar-accent"
-          onClick={() => setSidebarCollapsed((v) => !v)}
-          aria-label={sidebarCollapsed ? "Expandir barra lateral" : "Retraer barra lateral"}
-          title={sidebarCollapsed ? "Expandir barra lateral" : "Retraer barra lateral"}
-        >
-          <ChevronRight
-            className={
-              "h-4 w-4 transition-transform duration-200 " +
-              (sidebarCollapsed ? "rotate-180" : "")
-            }
-          />
-        </Button>
+        {!mobile && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 shrink-0 border border-border/30 hover:bg-sidebar-accent"
+            onClick={() => setSidebarCollapsed((v) => !v)}
+            aria-label={sidebarCollapsed ? "Expandir barra lateral" : "Retraer barra lateral"}
+            title={sidebarCollapsed ? "Expandir barra lateral" : "Retraer barra lateral"}
+          >
+            <ChevronRight
+              className={
+                "h-4 w-4 transition-transform duration-200 " +
+                (sidebarCollapsed ? "rotate-180" : "")
+              }
+            />
+          </Button>
+        )}
       </div>
 
       <div className="p-3 space-y-2">
