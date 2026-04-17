@@ -4,6 +4,7 @@ import {
   getListOpenaiConversationsQueryKey,
 } from "@workspace/api-client-react";
 import { Link, useLocation } from "wouter";
+import { useClerk, useUser } from "@clerk/react";
 import { Button } from "@/components/ui/button";
 import {
   Plus,
@@ -23,6 +24,7 @@ import {
   FolderOpen,
   Pencil,
   FolderInput,
+  LogOut,
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useQueryClient } from "@tanstack/react-query";
@@ -212,6 +214,9 @@ export function Sidebar() {
   const toggleCollapsed = (key: number | "none") =>
     setCollapsed((s) => ({ ...s, [key]: !s[key] }));
 
+  const { signOut } = useClerk();
+  const { user } = useUser();
+
   return (
     <div
       className={
@@ -352,6 +357,22 @@ export function Sidebar() {
           />
         </div>
       </ScrollArea>
+
+      <div className="p-3 border-t border-sidebar-border space-y-2">
+        {user && (
+          <div className="text-[11px] font-mono text-muted-foreground truncate px-1">
+            {user.primaryEmailAddress?.emailAddress ?? user.username ?? "Sesión activa"}
+          </div>
+        )}
+        <Button
+          onClick={() => signOut()}
+          variant="ghost"
+          className="w-full justify-start gap-2 border border-border/40 hover:bg-sidebar-accent"
+        >
+          <LogOut className="w-4 h-4" />
+          Cerrar sesión
+        </Button>
+      </div>
 
       <ProjectDialog
         open={dialogOpen}

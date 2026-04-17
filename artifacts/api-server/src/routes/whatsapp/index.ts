@@ -1,5 +1,6 @@
-import { Router } from "express";
+import { Router, type Request, type Response, type NextFunction } from "express";
 import { and, asc, desc, eq, ne, or, sql } from "drizzle-orm";
+import { requireAuth } from "../../middlewares/requireAuth";
 import {
   db,
   whatsappContacts,
@@ -18,6 +19,16 @@ import {
 } from "../../lib/whatsapp/evolution";
 
 const router = Router();
+
+// Require auth for all WhatsApp routes EXCEPT the public webhook (which uses
+// its own shared-secret check). The whatsapp router is mounted at the parent's
+// root, so we must scope this middleware to /whatsapp/* paths and fall-through
+// for everything else (health, openai, calendar, etc.).
+router.use((req: Request, res: Response, next: NextFunction) => {
+  if (!req.path.startsWith("/whatsapp")) return next();
+  if (req.path === "/whatsapp/webhook") return next();
+  return requireAuth(req, res, next);
+});
 
 const SAFE_SETTING_KEYS = [
   "evolutionBaseUrl",
