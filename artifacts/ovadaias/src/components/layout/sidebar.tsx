@@ -37,6 +37,7 @@ import {
   createProject,
   deleteProject,
   listProjects,
+  setProjectsApiAuthToken,
   updateConversation,
   updateProject,
 } from "@/lib/projects-api";
@@ -141,6 +142,15 @@ export function Sidebar({
     }
   };
 
+  const { signOut } = useClerk();
+  const { user } = useUser();
+  const { getToken } = useAuth();
+
+  useEffect(() => {
+    setProjectsApiAuthToken(() => getToken());
+    return () => setProjectsApiAuthToken(null);
+  }, [getToken]);
+
   useEffect(() => {
     refreshProjects();
   }, []);
@@ -217,6 +227,24 @@ export function Sidebar({
     }
   };
 
+  const handleRenameConversation = async (convId: number, currentTitle: string) => {
+    const next = window.prompt("Nuevo nombre del chat", currentTitle || "");
+    if (next === null) return;
+    const trimmed = next.trim();
+    if (!trimmed || trimmed === currentTitle) return;
+    try {
+      await updateConversation(convId, { title: trimmed });
+      await refreshConversations();
+      toast({ title: "Chat renombrado" });
+    } catch (e) {
+      toast({
+        title: "Error",
+        description: e instanceof Error ? e.message : "No se pudo renombrar",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleDeleteConversation = async (convId: number) => {
     if (!window.confirm("¿Eliminar este chat? Esta acción no se puede deshacer.")) {
       return;
@@ -251,10 +279,6 @@ export function Sidebar({
   const navButtonClass = sidebarCollapsed
     ? "w-10 justify-center gap-0 border border-border/40 hover:bg-sidebar-accent px-0"
     : "w-full justify-start gap-2 border border-border/40 hover:bg-sidebar-accent";
-
-  const { signOut } = useClerk();
-  const { user } = useUser();
-  const { getToken } = useAuth();
 
   return (
     <div
@@ -409,8 +433,10 @@ export function Sidebar({
                     setEditingProject(proj);
                     setDialogOpen(true);
                   }}
+                  onDelete={() => handleDeleteProject(proj.id)}
                   onMoveConversation={handleMoveConversation}
                   onDeleteConversation={handleDeleteConversation}
+                  onRenameConversation={handleRenameConversation}
                   projects={projects}
                 />
               );
@@ -422,6 +448,7 @@ export function Sidebar({
             onToggle={() => toggleCollapsed("none")}
             onMoveConversation={handleMoveConversation}
             onDeleteConversation={handleDeleteConversation}
+            onRenameConversation={handleRenameConversation}
             projects={projects}
           />
         </div>
@@ -466,8 +493,10 @@ function ProjectGroup({
   onToggle,
   onAddChat,
   onEdit,
+  onDelete,
   onMoveConversation,
   onDeleteConversation,
+  onRenameConversation,
   projects,
 }: {
   project: ChatProject;
@@ -476,8 +505,10 @@ function ProjectGroup({
   onToggle: () => void;
   onAddChat: () => void;
   onEdit: () => void;
+  onDelete: () => void;
   onMoveConversation: (convId: number, projectId: number | null) => void;
   onDeleteConversation: (convId: number) => void;
+  onRenameConversation: (convId: number, currentTitle: string) => void;
   projects: ChatProject[];
 }) {
   const dot = project.color || "#a855f7";
@@ -509,22 +540,44 @@ function ProjectGroup({
             {conversations.length}
           </span>
         </button>
-        <div className="flex items-center pr-1 opacity-0 group-hover:opacity-100 transition">
-          <button
-            onClick={onAddChat}
-            title="Nuevo chat en este proyecto"
-            className="p-1 hover:text-primary text-muted-foreground"
-          >
-            <Plus className="w-3.5 h-3.5" />
-          </button>
-          <button
-            onClick={onEdit}
-            title="Editar proyecto"
-            className="p-1 hover:text-primary text-muted-foreground"
-          >
-            <Pencil className="w-3.5 h-3.5" />
-          </button>
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              className="opacity-70 md:opacity-0 md:group-hover:opacity-100 p-1.5 mr-1 hover:text-primary text-muted-foreground"
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+              }}
+              aria-label="Opciones del proyecto"
+              title="Opciones"
+            >
+              <MoreHorizontal className="w-4 h-4" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-52">
+            <DropdownMenuItem onClick={onAddChat} className="text-xs">
+              <Plus className="w-3.5 h-3.5 mr-2" /> Nuevo chat aquí
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onEdit} className="text-xs">
+              <Pencil className="w-3.5 h-3.5 mr-2" /> Editar carpeta
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => {
+                if (
+                  window.confirm(
+                    `¿Eliminar la carpeta "${project.name}"? Los chats no se borran, quedan sin carpeta.`,
+                  )
+                ) {
+                  onDelete();
+                }
+              }}
+              className="text-xs text-destructive focus:text-destructive"
+            >
+              Eliminar carpeta
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {!collapsed && (
@@ -544,6 +597,7 @@ function ProjectGroup({
                 projects={projects}
                 onMove={onMoveConversation}
                 onDelete={onDeleteConversation}
+                onRename={onRenameConversation}
               />
             ))
           )}
@@ -559,6 +613,7 @@ function UnassignedGroup({
   onToggle,
   onMoveConversation,
   onDeleteConversation,
+  onRenameConversation,
   projects,
 }: {
   conversations: Conv[];
@@ -566,6 +621,7 @@ function UnassignedGroup({
   onToggle: () => void;
   onMoveConversation: (convId: number, projectId: number | null) => void;
   onDeleteConversation: (convId: number) => void;
+  onRenameConversation: (convId: number, currentTitle: string) => void;
   projects: ChatProject[];
 }) {
   if (conversations.length === 0) return null;
@@ -610,11 +666,13 @@ function ConversationRow({
   projects,
   onMove,
   onDelete,
+  onRename,
 }: {
   conv: Conv;
   projects: ChatProject[];
   onMove: (convId: number, projectId: number | null) => void;
   onDelete: (convId: number) => void;
+  onRename: (convId: number, currentTitle: string) => void;
 }) {
   const [location] = useLocation();
   const isActive = location === `/chat/${conv.id}`;
@@ -682,6 +740,12 @@ function ConversationRow({
             </div>
           )}
           <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onClick={() => onRename(conv.id, conv.title)}
+            className="text-xs"
+          >
+            <Pencil className="w-3.5 h-3.5 mr-2" /> Renombrar chat
+          </DropdownMenuItem>
           <DropdownMenuItem
             onClick={() => onDelete(conv.id)}
             className="text-xs text-destructive focus:text-destructive"

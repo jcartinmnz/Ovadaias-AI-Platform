@@ -25,8 +25,40 @@ export const PROJECT_COLORS = [
   "#8b5cf6", // violet
 ];
 
+let _tokenGetter: (() => Promise<string | null>) | null = null;
+
+export function setProjectsApiAuthToken(
+  getter: (() => Promise<string | null>) | null,
+) {
+  _tokenGetter = getter;
+}
+
+async function authHeaders(extra?: HeadersInit): Promise<HeadersInit> {
+  const headers: Record<string, string> = {};
+  if (extra) {
+    if (extra instanceof Headers) {
+      extra.forEach((v, k) => (headers[k] = v));
+    } else if (Array.isArray(extra)) {
+      extra.forEach(([k, v]) => (headers[k] = v));
+    } else {
+      Object.assign(headers, extra);
+    }
+  }
+  if (_tokenGetter) {
+    try {
+      const t = await _tokenGetter();
+      if (t) headers["Authorization"] = `Bearer ${t}`;
+    } catch {
+      /* ignore */
+    }
+  }
+  return headers;
+}
+
 export async function listProjects(): Promise<ChatProject[]> {
-  const r = await fetch(`${BASE}/chat-projects`);
+  const r = await fetch(`${BASE}/chat-projects`, {
+    headers: await authHeaders(),
+  });
   if (!r.ok) throw new Error("No se pudieron cargar los proyectos");
   return r.json();
 }
@@ -34,7 +66,7 @@ export async function listProjects(): Promise<ChatProject[]> {
 export async function createProject(input: ProjectInput): Promise<ChatProject> {
   const r = await fetch(`${BASE}/chat-projects`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: await authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify(input),
   });
   if (!r.ok) throw new Error("No se pudo crear el proyecto");
@@ -47,7 +79,7 @@ export async function updateProject(
 ): Promise<ChatProject> {
   const r = await fetch(`${BASE}/chat-projects/${id}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: await authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify(input),
   });
   if (!r.ok) throw new Error("No se pudo actualizar el proyecto");
@@ -55,7 +87,10 @@ export async function updateProject(
 }
 
 export async function deleteProject(id: number): Promise<void> {
-  const r = await fetch(`${BASE}/chat-projects/${id}`, { method: "DELETE" });
+  const r = await fetch(`${BASE}/chat-projects/${id}`, {
+    method: "DELETE",
+    headers: await authHeaders(),
+  });
   if (!r.ok) throw new Error("No se pudo eliminar el proyecto");
 }
 
@@ -68,9 +103,9 @@ export async function updateConversation(
   id: number,
   patch: UpdateConversationPatch,
 ) {
-  const r = await fetch(`${BASE}/openai/conversations/${id}`, {
+  const r = await fetch(`${BASE}/chat-projects/conversations/${id}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: await authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify(patch),
   });
   if (!r.ok) throw new Error("No se pudo actualizar la conversación");
@@ -83,7 +118,7 @@ export async function createConversationInProject(
 ) {
   const r = await fetch(`${BASE}/openai/conversations`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: await authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({ title, projectId }),
   });
   if (!r.ok) throw new Error("No se pudo crear la conversación");
