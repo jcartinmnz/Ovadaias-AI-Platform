@@ -4,7 +4,7 @@ import {
   getListOpenaiConversationsQueryKey,
 } from "@workspace/api-client-react";
 import { Link, useLocation } from "wouter";
-import { useClerk, useUser } from "@clerk/react";
+import { useAuth, useClerk, useUser } from "@clerk/react";
 import { Button } from "@/components/ui/button";
 import {
   Plus,
@@ -218,10 +218,17 @@ export function Sidebar({
   };
 
   const handleDeleteConversation = async (convId: number) => {
+    if (!window.confirm("¿Eliminar este chat? Esta acción no se puede deshacer.")) {
+      return;
+    }
     try {
+      const token = await getToken();
       const res = await fetch(
         `${import.meta.env.BASE_URL.replace(/\/$/, "")}/api/openai/conversations/${convId}`,
-        { method: "DELETE" },
+        {
+          method: "DELETE",
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        },
       );
       if (!res.ok) throw new Error("No se pudo eliminar el chat");
       await refreshConversations();
@@ -247,6 +254,7 @@ export function Sidebar({
 
   const { signOut } = useClerk();
   const { user } = useUser();
+  const { getToken } = useAuth();
 
   return (
     <div
@@ -628,10 +636,14 @@ function ConversationRow({
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
-            className="opacity-0 group-hover:opacity-100 p-1 mr-1 hover:text-primary text-muted-foreground"
-            onClick={(e) => e.stopPropagation()}
+            className="opacity-70 md:opacity-0 md:group-hover:opacity-100 p-1.5 mr-1 hover:text-primary text-muted-foreground"
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+            }}
+            aria-label="Opciones del chat"
           >
-            <MoreHorizontal className="w-3.5 h-3.5" />
+            <MoreHorizontal className="w-4 h-4" />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
