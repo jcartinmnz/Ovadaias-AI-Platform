@@ -256,7 +256,26 @@ function ProtectedRoutes() {
   );
 }
 
+const devAuthBypass =
+  import.meta.env.VITE_DEV_AUTH_BYPASS === "true" ||
+  import.meta.env.VITE_DEV_AUTH_BYPASS === "1";
+
 function AppRoutes() {
+  if (devAuthBypass) {
+    return (
+      <Switch>
+        <Route path="/sign-in/*?">
+          <Redirect to="/" />
+        </Route>
+        <Route path="/sign-up/*?">
+          <Redirect to="/" />
+        </Route>
+        <Route>
+          <ProtectedRoutes />
+        </Route>
+      </Switch>
+    );
+  }
   return (
     <Switch>
       <Route path="/sign-in/*?" component={SignInPage} />

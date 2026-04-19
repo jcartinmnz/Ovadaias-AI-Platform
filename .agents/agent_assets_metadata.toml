@@ -1,0 +1,74 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "ZpLE_AWs4vYa453r39wd2"
+uri = "file://screenshots/01-home.jpg"
+type = "image"
+title = "1. Home — Chat principal con sidebar y proyectos cargados"
+
+[[outputs]]
+id = "x-no8Hn4cG0H0Sx87Qi4K"
+uri = "file://screenshots/09-chat-rag.jpg"
+type = "image"
+title = "2. Chat con RAG — Ovadaias responde sobre vacaciones usando la base de conocimiento"
+
+[[outputs]]
+id = "a4_BQU8-kHNN4E1pYMXZx"
+uri = "file://screenshots/10-chat-calendar.jpg"
+type = "image"
+title = "3. Chat con sub-agente Calendario — agendó la reunión Sync semanal"
+
+[[outputs]]
+id = "BkOC-VZQI2f4BD5uC-3hH"
+uri = "file://screenshots/02-knowledge.jpg"
+type = "image"
+title = "4. Knowledge Base — 4 documentos indexados (security, dresscode, políticas)"
+
+[[outputs]]
+id = "Q4LQc2HjuAGD4QKJgvEdo"
+uri = "file://screenshots/03-marketing.jpg"
+type = "image"
+title = "5. Marketing Studio — sub-agente creativo (brief → storyboard → imágenes)"
+
+[[outputs]]
+id = "aGjGtCMSR_OnVRsgjpbTM"
+uri = "file://screenshots/04-calendar.jpg"
+type = "image"
+title = "6. Calendar — agenda con eventos, hora local y próximos"
+
+[[outputs]]
+id = "k8TesX4ch5gWqUGFvgcSc"
+uri = "file://screenshots/05-insights.jpg"
+type = "image"
+title = "7. Insights — dashboard analítica del servicio al cliente"
+
+[[outputs]]
+id = "Rys9qD0lKAt7y1X-ca6aQ"
+uri = "file://screenshots/06-whatsapp-inbox.jpg"
+type = "image"
+title = "8. WhatsApp Inbox — conversaciones de clientes vía Evolution API"
+
+[[outputs]]
+id = "cdYArLTMN1aqvkSh8XLyn"
+uri = "file://screenshots/07-whatsapp-tickets.jpg"
+type = "image"
+title = "9. WhatsApp Tickets — Kanban (Abierto / En progreso / Resuelto / Cerrado)"
+
+[[outputs]]
+id = "q4HE0qic2zXGdBe03CjdC"
+uri = "file://screenshots/08-whatsapp-settings.jpg"
+type = "image"
+title = "10. WhatsApp Settings — configuración Evolution API + agente IA"
+
+[[outputs]]
+id = "Oi0BIHmFcWtk3Ko0pInjd"
+uri = "file://screenshots/11-mobile-home.jpg"
+type = "image"
+title = "11. Mobile — chat principal responsive (header con hamburguesa)"
+
+[[outputs]]
+id = "kYDaW4WkdmWiOV5hy_7YR"
+uri = "file://screenshots/12-mobile-whatsapp.jpg"
+type = "image"
+title = "12. Mobile — Inbox de WhatsApp adaptado a celular"

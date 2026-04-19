@@ -29,3 +29,4 @@ to = "/index.html"
 [services.env]
 PORT = "25903"
 BASE_PATH = "/"
+VITE_DEV_AUTH_BYPASS = "true"
