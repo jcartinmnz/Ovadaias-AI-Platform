@@ -147,7 +147,10 @@ export default function ChatPage() {
                 <ChatMessage key={msg.id} role={msg.role} content={msg.content} />
               ))}
               {streamingMessage && streamingMessage.content && (
-                <ChatMessage role={streamingMessage.role} content={streamingMessage.content} />
+                <ChatMessage
+                  role={streamingMessage.role}
+                  content={streamingMessage.content + "▍"}
+                />
               )}
               {isStreaming && activity && (
                 <div className="flex w-full py-3 px-4 md:px-8 justify-start bg-primary/5 border-y border-primary/20">
@@ -172,14 +175,17 @@ export default function ChatPage() {
                 <div className="flex w-full py-4 px-4 md:px-8 justify-start">
                   <div className="flex max-w-4xl gap-4 w-full">
                     <div className="w-8 h-8 rounded-md flex items-center justify-center shrink-0 mt-1 bg-primary/20 text-primary border border-primary/30">
-                      <TerminalSquare className="w-4 h-4" />
+                      <TerminalSquare className="w-4 h-4 animate-pulse" />
                     </div>
-                    <div className="flex-1 flex items-center">
+                    <div className="flex-1 flex items-center gap-3">
                       <div className="flex gap-1">
-                        <div className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: "0ms" }} />
-                        <div className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: "150ms" }} />
-                        <div className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: "300ms" }} />
+                        <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: "0ms" }} />
+                        <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: "150ms" }} />
+                        <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: "300ms" }} />
                       </div>
+                      <span className="text-xs font-mono text-primary/80 uppercase tracking-wider animate-pulse">
+                        Ovadaias está escribiendo…
+                      </span>
                     </div>
                   </div>
                 </div>
