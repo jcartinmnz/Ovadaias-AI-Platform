@@ -5,6 +5,10 @@ import { retrieveRelevantChunks, formatContextForPrompt } from "../../lib/rag";
 
 const router = Router();
 
+// ---------------------------------------------------------------------------
+// Shared visual prompt guide for Gemini Flash Image
+// ---------------------------------------------------------------------------
+
 const NANO_BANANA_GUIDE = `
 Guía obligatoria para escribir prompts de Nano Banana (Gemini Flash Image):
 
@@ -22,6 +26,10 @@ REGLAS DURAS:
 - Si hay texto en la imagen: ponlo entre comillas exactas y describe la fuente, color y posición (p. ej. "bold white sans-serif at the bottom center"). Si el cliente no proporcionó copy, NO inventes texto.
 - Deriva marca, paleta, tipografía y tono ÚNICAMENTE del brief y del contexto del cliente. Si no hay info de marca, usa estética neutra y profesional.
 - Sin emojis, sin Markdown, sin explicaciones meta.`;
+
+// ---------------------------------------------------------------------------
+// System prompts — legacy single-image flow
+// ---------------------------------------------------------------------------
 
 const SINGLE_PROMPT_SYSTEM = `Eres un sub-agente de dirección creativa visual dentro de la plataforma Ovadaias, equivalente a un director creativo senior de agencia.
 Tu única tarea es generar UN prompt en INGLÉS para el modelo Nano Banana, siguiendo fielmente los requerimientos del cliente y la guía técnica que se te proporciona.
@@ -45,6 +53,66 @@ FORMATO DE SALIDA:
 Devuelve EXCLUSIVAMENTE un objeto JSON válido con esta forma exacta:
 {"slides":[{"title":"Título corto en español","prompt":"English prompt ending with 'Aspect ratio: X:Y.'"}, ...]}
 Sin Markdown, sin comentarios, sin texto fuera del JSON.`;
+
+// ---------------------------------------------------------------------------
+// System prompts — caption-first flow (new)
+// ---------------------------------------------------------------------------
+
+const CAPTION_SYSTEM = `Eres un copywriter de marketing digital especializado en redes sociales para el mercado latinoamericano.
+Tu tarea es generar contenido de marketing de alta conversión en ESPAÑOL.
+
+PLATAFORMAS:
+- instagram: Emocional, storytelling, saltos de línea frecuentes, emojis estratégicos, máx 2200 chars.
+- linkedin: Profesional y analítico, datos concretos, tono de liderazgo, máx 3000 chars, emojis moderados.
+- twitter: Conciso e impactante, máx 280 chars, hashtags integrados al final.
+
+TONOS:
+- educativo: Tips claros, frameworks, explica el "por qué", tono didáctico y accesible.
+- ventas: Beneficios concretos antes que características, CTA directo, urgencia real.
+- caso_exito: Narrativa de transformación — Situación → Desafío → Solución → Resultado con métricas.
+- insight: Dato contraintuitivo o reflexión de industria que sorprende, perspectiva única.
+- anuncio: Novedad del producto/servicio, tono entusiasta y profesional, qué hay de nuevo y por qué importa.
+
+SALIDA — JSON válido EXCLUSIVAMENTE, sin texto fuera del JSON:
+{
+  "caption": "Texto completo listo para publicar en español",
+  "hashtags": ["hashtag1", "hashtag2"],
+  "altTexts": ["Descripción accesible slide 1", "Descripción accesible slide 2"]
+}
+
+Reglas:
+- altTexts: exactamente N elementos, uno por cada slide solicitado. Descripciones útiles para accesibilidad, en español.
+- hashtags: entre 5 y 12, relevantes para el tema y la plataforma.
+- Sin markdown fuera del JSON.`;
+
+const PROMPTS_FROM_CAPTION_SYSTEM = `Eres un director creativo visual dentro de la plataforma Ovadaias.
+Conviertes un caption de marketing en prompts de imagen para el modelo Nano Banana (Gemini Flash Image).
+
+${NANO_BANANA_GUIDE}
+
+ROLES NARRATIVOS — prefija cada prompt con su rol entre corchetes:
+Para carruseles (N > 1):
+  slide 1 → [HOOK]: gancho visual impactante
+  slide 2 → [PROBLEMA]: punto de dolor o situación inicial (si N >= 3)
+  slides intermedios → [DESARROLLO]: solución, beneficio, proceso
+  slide final → [CTA]: llamada a la acción, cierre inspirador
+
+Para post único: usa [POST]
+Para historia: usa [HISTORIA]
+
+ASPECT RATIOS según tipo:
+- single / carousel en Instagram o LinkedIn → "4:5"
+- story → "9:16"
+- twitter → "16:9"
+
+SALIDA — JSON válido EXCLUSIVAMENTE:
+{"prompts": ["[ROL] English prompt ending with 'Aspect ratio: X:Y.'", ...]}
+
+Devuelve EXACTAMENTE el mismo número de prompts que slides pedidos.`;
+
+// ---------------------------------------------------------------------------
+// Helper functions — legacy
+// ---------------------------------------------------------------------------
 
 async function craftPrompt(args: {
   brief: string;
@@ -134,8 +202,125 @@ async function craftCarouselPrompts(args: {
   });
 }
 
+// ---------------------------------------------------------------------------
+// Helper functions — caption-first flow (new)
+// ---------------------------------------------------------------------------
+
+async function craftCaption(args: {
+  brief: string;
+  platform: string;
+  tone: string;
+  postType: string;
+  slideCount: number;
+  knowledgeContext: string;
+}): Promise<{ caption: string; hashtags: string[]; altTexts: string[] }> {
+  const userPayload = [
+    `Brief: ${args.brief}`,
+    `Plataforma: ${args.platform}`,
+    `Tono: ${args.tone}`,
+    `Tipo de post: ${args.postType}`,
+    `Número de slides: ${args.slideCount}`,
+    args.knowledgeContext
+      ? `Contexto de la marca (úsalo para alinear voz, tono y datos):\n${args.knowledgeContext}`
+      : null,
+    `Genera exactamente ${args.slideCount} altTexts en el array.`,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+
+  const completion = await openai.chat.completions.create({
+    model: "gpt-5.2",
+    messages: [
+      { role: "system", content: CAPTION_SYSTEM },
+      { role: "user", content: userPayload },
+    ],
+    response_format: { type: "json_object" },
+    max_completion_tokens: 1500,
+  });
+
+  const text = completion.choices[0]?.message?.content?.trim();
+  if (!text) throw new Error("No se generó el caption");
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new Error("Caption inválido (JSON malformado)");
+  }
+
+  const p = parsed as { caption?: unknown; hashtags?: unknown; altTexts?: unknown };
+  const caption = typeof p.caption === "string" ? p.caption.trim() : "";
+  if (!caption) throw new Error("Caption vacío");
+
+  const hashtags = Array.isArray(p.hashtags)
+    ? p.hashtags.filter((h): h is string => typeof h === "string").map((h) => h.replace(/^#/, ""))
+    : [];
+
+  const altTexts = Array.isArray(p.altTexts)
+    ? p.altTexts.filter((a): a is string => typeof a === "string")
+    : Array(args.slideCount).fill("");
+
+  return { caption, hashtags, altTexts };
+}
+
+async function craftPromptsFromCaption(args: {
+  brief: string;
+  caption: string;
+  postType: string;
+  slideCount: number;
+  platform: string;
+  tone: string;
+}): Promise<string[]> {
+  const userPayload = [
+    `Brief original: ${args.brief}`,
+    `Caption generado:\n${args.caption}`,
+    `Plataforma: ${args.platform}`,
+    `Tono: ${args.tone}`,
+    `Tipo de post: ${args.postType}`,
+    `Slides: ${args.slideCount}`,
+    `Devuelve exactamente ${args.slideCount} prompts en el array.`,
+  ].join("\n\n");
+
+  const completion = await openai.chat.completions.create({
+    model: "gpt-5.2",
+    messages: [
+      { role: "system", content: PROMPTS_FROM_CAPTION_SYSTEM },
+      { role: "user", content: userPayload },
+    ],
+    response_format: { type: "json_object" },
+    max_completion_tokens: 400 * args.slideCount + 400,
+  });
+
+  const text = completion.choices[0]?.message?.content?.trim();
+  if (!text) throw new Error("No se generaron los prompts");
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new Error("Prompts inválidos (JSON malformado)");
+  }
+
+  const p = parsed as { prompts?: unknown };
+  if (!Array.isArray(p.prompts) || p.prompts.length === 0) {
+    throw new Error("Prompts inválidos");
+  }
+
+  return p.prompts.slice(0, args.slideCount).map((pr, i) => {
+    if (typeof pr !== "string" || !pr.trim()) {
+      throw new Error(`Prompt ${i + 1} inválido`);
+    }
+    return pr.trim();
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Validation helpers
+// ---------------------------------------------------------------------------
+
 const MAX_BRIEF = 2000;
 const MAX_FIELD = 200;
+const MAX_CAPTION = 3000;
 const MAX_SLIDES = 10;
 
 function clean(value: unknown, max: number): string | undefined {
@@ -143,6 +328,10 @@ function clean(value: unknown, max: number): string | undefined {
   const trimmed = value.trim().slice(0, max);
   return trimmed || undefined;
 }
+
+// ---------------------------------------------------------------------------
+// Routes — legacy (kept for backward compatibility)
+// ---------------------------------------------------------------------------
 
 router.post("/marketing/generate-asset", async (req, res) => {
   const body = req.body ?? {};
@@ -228,6 +417,114 @@ router.post("/marketing/generate-asset", async (req, res) => {
     res.status(500).json({
       error: "No se pudo generar el activo. Inténtalo de nuevo en unos instantes.",
     });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Routes — caption-first flow (new)
+// ---------------------------------------------------------------------------
+
+router.post("/marketing/generate-caption", async (req, res) => {
+  const body = req.body ?? {};
+  const brief = clean(body.brief, MAX_BRIEF);
+  if (!brief) {
+    res.status(400).json({ error: "El brief es requerido" });
+    return;
+  }
+
+  const platform = clean(body.platform, 50) ?? "instagram";
+  const tone = clean(body.tone, 50) ?? "ventas";
+  const postType = clean(body.postType, 50) ?? "carousel";
+  const useKnowledge = body.useKnowledge !== false;
+
+  const rawSlides = Number(body.slideCount);
+  const slideCount =
+    Number.isFinite(rawSlides) && rawSlides >= 1
+      ? Math.min(MAX_SLIDES, Math.floor(rawSlides))
+      : 1;
+
+  try {
+    let knowledgeContext = "";
+    let sources: { documentId: number; documentTitle: string }[] = [];
+
+    if (useKnowledge) {
+      const chunks = await retrieveRelevantChunks(brief, 4);
+      knowledgeContext = formatContextForPrompt(chunks);
+      sources = chunks.map((c) => ({
+        documentId: c.documentId,
+        documentTitle: c.documentTitle,
+      }));
+    }
+
+    const { caption, hashtags, altTexts } = await craftCaption({
+      brief,
+      platform,
+      tone,
+      postType,
+      slideCount,
+      knowledgeContext,
+    });
+
+    res.json({ caption, hashtags, altTexts, sources });
+  } catch (err) {
+    console.error("[marketing] caption generation failed:", err);
+    res.status(500).json({
+      error: "No se pudo generar el caption. Inténtalo de nuevo.",
+    });
+  }
+});
+
+router.post("/marketing/generate-prompts", async (req, res) => {
+  const body = req.body ?? {};
+  const brief = clean(body.brief, MAX_BRIEF);
+  const caption = clean(body.caption, MAX_CAPTION);
+  if (!brief || !caption) {
+    res.status(400).json({ error: "Brief y caption son requeridos" });
+    return;
+  }
+
+  const platform = clean(body.platform, 50) ?? "instagram";
+  const tone = clean(body.tone, 50) ?? "ventas";
+  const postType = clean(body.postType, 50) ?? "carousel";
+
+  const rawSlides = Number(body.slideCount);
+  const slideCount =
+    Number.isFinite(rawSlides) && rawSlides >= 1
+      ? Math.min(MAX_SLIDES, Math.floor(rawSlides))
+      : 1;
+
+  try {
+    const prompts = await craftPromptsFromCaption({
+      brief,
+      caption,
+      postType,
+      slideCount,
+      platform,
+      tone,
+    });
+    res.json({ prompts });
+  } catch (err) {
+    console.error("[marketing] prompts generation failed:", err);
+    res.status(500).json({
+      error: "No se pudieron generar los prompts de imagen.",
+    });
+  }
+});
+
+router.post("/marketing/generate-image", async (req, res) => {
+  const body = req.body ?? {};
+  const prompt = clean(body.prompt, MAX_BRIEF);
+  if (!prompt) {
+    res.status(400).json({ error: "El prompt es requerido" });
+    return;
+  }
+
+  try {
+    const { b64_json, mimeType } = await generateImage(prompt);
+    res.json({ b64: b64_json, mimeType });
+  } catch (err) {
+    console.error("[marketing] image generation failed:", err);
+    res.status(500).json({ error: "No se pudo generar la imagen." });
   }
 });
 
