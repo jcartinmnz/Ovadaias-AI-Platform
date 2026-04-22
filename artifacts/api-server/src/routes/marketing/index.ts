@@ -1,9 +1,40 @@
 import { Router } from "express";
 import { openai } from "@workspace/integrations-openai-ai-server";
-import { generateImage } from "@workspace/integrations-gemini-ai/image";
 import { retrieveRelevantChunks, formatContextForPrompt } from "../../lib/rag";
 
 const router = Router();
+
+const IMAGE_MODEL = "gpt-image-2";
+
+// Parse the trailing "Aspect ratio: X:Y." clause and map to an OpenAI image size.
+// gpt-image-2 supports square, portrait and landscape. We pick the closest bucket.
+function pickSize(prompt: string): "1024x1024" | "1024x1536" | "1536x1024" {
+  const m = prompt.match(/Aspect ratio:\s*(\d+):(\d+)/i);
+  if (!m) return "1024x1024";
+  const w = Number(m[1]);
+  const h = Number(m[2]);
+  if (!w || !h) return "1024x1024";
+  const ratio = w / h;
+  if (ratio < 0.9) return "1024x1536"; // portrait (4:5, 9:16, 2:3)
+  if (ratio > 1.1) return "1536x1024"; // landscape (16:9, 3:2)
+  return "1024x1024"; // square (1:1)
+}
+
+async function generateImage(
+  prompt: string,
+): Promise<{ b64_json: string; mimeType: string }> {
+  const response = await openai.images.generate({
+    model: IMAGE_MODEL,
+    prompt,
+    size: pickSize(prompt),
+    n: 1,
+  });
+  const b64 = response.data?.[0]?.b64_json;
+  if (!b64) {
+    throw new Error("El modelo de imágenes no devolvió datos");
+  }
+  return { b64_json: b64, mimeType: "image/png" };
+}
 
 // ---------------------------------------------------------------------------
 // Shared visual prompt guide for Gemini Flash Image
@@ -382,7 +413,7 @@ router.post("/marketing/generate-asset", async (req, res) => {
           },
         ],
         sources,
-        model: "gemini-2.5-flash-image",
+        model: IMAGE_MODEL,
       });
       return;
     }
@@ -410,7 +441,7 @@ router.post("/marketing/generate-asset", async (req, res) => {
       mode: "carousel",
       slides: rendered,
       sources,
-      model: "gemini-2.5-flash-image",
+      model: IMAGE_MODEL,
     });
   } catch (err) {
     console.error("[marketing] generation failed:", err);
