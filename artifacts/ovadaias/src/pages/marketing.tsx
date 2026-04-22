@@ -453,27 +453,27 @@ export default function MarketingPage() {
                 </div>
 
                 {/* Platform */}
-                <ToggleGroup<Platform>
+                <ToggleGroup
                   label="Plataforma"
                   options={PLATFORMS}
                   value={platform}
-                  onChange={setPlatform}
+                  onChange={(v) => setPlatform(v as Platform)}
                 />
 
                 {/* Post type */}
-                <ToggleGroup<PostType>
+                <ToggleGroup
                   label="Tipo de publicación"
                   options={POST_TYPES}
                   value={postType}
-                  onChange={setPostType}
+                  onChange={(v) => setPostType(v as PostType)}
                 />
 
                 {/* Tone */}
-                <ToggleGroup<Tone>
+                <ToggleGroup
                   label="Tono"
                   options={TONES}
                   value={tone}
-                  onChange={setTone}
+                  onChange={(v) => setTone(v as Tone)}
                 />
 
                 {/* Slide count (carousel / story only) */}
