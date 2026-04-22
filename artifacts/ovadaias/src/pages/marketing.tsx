@@ -453,7 +453,7 @@ export default function MarketingPage() {
                 </div>
 
                 {/* Platform */}
-                <ToggleGroup
+                <ToggleGroup<Platform>
                   label="Plataforma"
                   options={PLATFORMS}
                   value={platform}
@@ -461,7 +461,7 @@ export default function MarketingPage() {
                 />
 
                 {/* Post type */}
-                <ToggleGroup
+                <ToggleGroup<PostType>
                   label="Tipo de publicación"
                   options={POST_TYPES}
                   value={postType}
@@ -469,7 +469,7 @@ export default function MarketingPage() {
                 />
 
                 {/* Tone */}
-                <ToggleGroup
+                <ToggleGroup<Tone>
                   label="Tono"
                   options={TONES}
                   value={tone}
